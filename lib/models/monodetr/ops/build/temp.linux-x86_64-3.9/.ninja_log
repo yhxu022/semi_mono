@@ -1,0 +1,4 @@
+# ninja log v5
+0	5880	1701588231097025893	/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/build/temp.linux-x86_64-3.9/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/src/cpu/ms_deform_attn_cpu.o	647a26eafbe496e7
+1	22438	1701588247653506290	/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/build/temp.linux-x86_64-3.9/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/src/vision.o	b5c9bc2e17ba2796
+0	46780	1701588271982198129	/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/build/temp.linux-x86_64-3.9/data/ipad_3d/monocular/MonoDETR/lib/models/monodetr/ops/src/cuda/ms_deform_attn_cuda.o	9c7c73eb8df262e1
