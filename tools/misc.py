@@ -1,4 +1,4 @@
-from mmdet3d.utils import SampleList
+# from mmdet3d.utils import SampleList
 from typing import List, Sequence, Tuple, Union
 def reweight_loss_dict(losses: dict, weight: float) -> dict:
     """Reweight losses in the dict by weight.
@@ -30,8 +30,8 @@ def rename_loss_dict(prefix: str, losses: dict) -> dict:
     """
     return {prefix + k: v for k, v in losses.items()}
 
-def _filter_gt_instances_by_score(batch_data_samples: SampleList,
-                                  score_thr: float) -> SampleList:
+def _filter_gt_instances_by_score(batch_data_samples,
+                                  score_thr: float):
     """Filter ground truth (GT) instances by score.
 
     Args:
@@ -56,8 +56,8 @@ def _filter_gt_instances_by_score(batch_data_samples: SampleList,
     return batch_data_samples
 
 
-def _filter_gt_instances_by_size(batch_data_samples: SampleList,
-                                 wh_thr: tuple) -> SampleList:
+def _filter_gt_instances_by_size(batch_data_samples,
+                                 wh_thr: tuple):
     """Filter ground truth (GT) instances by size.
 
     Args:
@@ -80,7 +80,7 @@ def _filter_gt_instances_by_size(batch_data_samples: SampleList,
                 (w > wh_thr[0]) & (h > wh_thr[1])]
     return batch_data_samples
 
-def filter_gt_instances(batch_data_samples: SampleList,
+def filter_gt_instances(batch_data_samples,
                         score_thr: float = None,
                         wh_thr: tuple = None):
     """Filter ground truth (GT) instances by score and/or size.

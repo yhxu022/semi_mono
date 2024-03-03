@@ -18,7 +18,7 @@ from lib.helpers.utils_helper import create_logger
 from tools.KITTI_METRIC import KITTI_METRIC
 from mmengine.runner import Runner
 from mmengine.logging import MMLogger
-from tools.multi_source_sampler import GroupMultiSourceSampler
+#from tools.multi_source_sampler import GroupMultiSourceSampler
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from tools.semi_base3d import SemiBase3DDetector
 from tools.mean_teacher_hook import MeanTeacherHook
@@ -41,7 +41,9 @@ def main():
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
 
     model_name = cfg['model_name']
-    output_path = os.path.join('./' + cfg["trainer"]['save_path'], model_name)
+    config_name, _ = os.path.splitext(os.path.basename(args.config))
+    #output_path = os.path.join('./' + cfg["trainer"]['save_path'], model_name)
+    output_path = os.path.join('./' + 'outputs' , config_name+'@'+datetime.datetime.now().strftime('%m%d_%H%M%S'))
     os.makedirs(output_path, exist_ok=True)
     log_file = os.path.join(output_path, 'train.log.%s' % datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     logger = MMLogger.get_instance('mmengine',log_file=log_file,log_level='INFO')
@@ -68,7 +70,7 @@ def main():
     dict(type="MeanTeacherHook", momentum=cfg["mean_teacher_hook"]["momentum"],interval=cfg["mean_teacher_hook"]["interval"],skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
 ]
     runner = Runner(model=model,
-    work_dir='./work_dir',
+    work_dir=output_path,
     custom_hooks=custom_hooks,
     train_dataloader=dict(
         batch_size=cfg["dataset"]['batch_size'],
@@ -97,6 +99,7 @@ def main():
     val_dataloader=test_loader,
     val_cfg = dict(type='TeacherStudentValLoop'),
     val_evaluator=dict(type=KITTI_METRIC,
+                        output_dir = output_path,
                         dataloader=test_loader,
                         logger=logger,
                         cfg=cfg),
@@ -127,10 +130,11 @@ def main():
     randomness=dict(seed=cfg.get('random_seed', 444),
                     diff_rank_seed=True,
                     deterministic=cfg.get('deterministic', False)),
-        launcher=args.launcher,
-        cfg = dict(
-    model_wrapper_cfg=dict(
-        type='MMDistributedDataParallel', find_unused_parameters=True))
+
+    launcher=args.launcher,
+    cfg = dict(
+        model_wrapper_cfg=dict(
+          type='MMDistributedDataParallel', find_unused_parameters=True))
 )
     runner.train()
 

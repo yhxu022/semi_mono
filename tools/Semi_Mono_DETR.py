@@ -55,8 +55,8 @@ class Semi_Mono_DETR(BaseModel):
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs,img_sizes, dn_args = 0)
             dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
-            pseudo_targets_list,mask=self.get_pseudo_targets_list(dets,calibs, dets.shape[0],self.cfg["semi_train_cfg"]["cls_pseudo_thr"],self.cfg["semi_train_cfg"]["score_pseudo_thr"])
-            return pseudo_targets_list,mask
+            pseudo_targets_list,mask,cls_score_list=self.get_pseudo_targets_list(dets,calibs, dets.shape[0],self.cfg["semi_train_cfg"]["cls_pseudo_thr"],self.cfg["semi_train_cfg"]["score_pseudo_thr"])
+            return pseudo_targets_list,mask,cls_score_list
         elif mode == 'unsup_loss':
             img_sizes = info['img_size']
             ##dn
@@ -88,6 +88,7 @@ class Semi_Mono_DETR(BaseModel):
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr):
         pseudo_targets_list = []
         mask_list = []
+        cls_score_list = batch_dets[:,:,1]
         for bz in range(batch_size):
             dets=batch_dets[bz]
             calib=batch_calibs[bz]
@@ -159,4 +160,4 @@ class Semi_Mono_DETR(BaseModel):
             pseudo_target_dict["heading_bin"]=heading_bins
             pseudo_target_dict["heading_res"]=heading_ress
             pseudo_targets_list.append(pseudo_target_dict)
-        return pseudo_targets_list,mask_list
+        return pseudo_targets_list,mask_list,cls_score_list

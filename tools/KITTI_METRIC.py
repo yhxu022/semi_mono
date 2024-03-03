@@ -4,12 +4,14 @@ from lib.datasets.kitti.kitti_eval_python.eval import get_official_eval_result
 import lib.datasets.kitti.kitti_eval_python.kitti_common as kitti
 class KITTI_METRIC(BaseMetric):
     def __init__(self,
+                  output_dir,
                   dataloader,
                   logger,
                   cfg
                   ):
         super().__init__()
-        self.output_dir = os.path.join('./' + cfg["trainer"]['save_path'], cfg["model_name"])
+        # self.output_dir = os.path.join('./' + cfg["trainer"]['save_path'], cfg["model_name"])
+        self.output_dir = output_dir
         self.dataloader = dataloader
         self.logger=logger
         self.class_name = dataloader["dataset"].class_name
@@ -30,7 +32,7 @@ class KITTI_METRIC(BaseMetric):
         return dict(car_moderate=self.kitti_evaluate())
     
     def save_results(self, results):
-        output_dir = os.path.join(self.output_dir, 'outputs', 'data')
+        output_dir = os.path.join(self.output_dir, 'data')
         os.makedirs(output_dir, exist_ok=True)
 
         for img_id in results.keys():

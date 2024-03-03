@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="f9e1d9a3-92ca-461d-b0d9-1ef33e8993f0" name="THU semimono">
+        <fileTransfer rootFolder="/home/xyh/MonoDETR_semi_baseline" accessType="SFTP" host="166.111.17.86" port="22" sshConfigId="c9fc31f6-e6ab-4b5f-ac65-52c8a642d4f8" sshConfig="xyh@166.111.17.86:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

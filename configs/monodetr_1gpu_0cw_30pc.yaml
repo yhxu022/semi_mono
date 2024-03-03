@@ -8,8 +8,8 @@ dataset:
   fold: 1 #半监督有标签的折数1,2,3,4,5
   percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
   test_split: 'val'
-  batch_size: 4
-  sup_size: 2 
+  batch_size: 16
+  sup_size: 8
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -29,11 +29,11 @@ dataset:
   depth_scale: 'normal'
 
 semi_train_cfg: 
-  sup_size: 2       
+  sup_size: 8       
   freeze_teacher: True # 冻结教师
   sup_weight: 1 # 监督权重
   unsup_weight: 0.1 # 无监督权重
-  consistency_weight: 0.1 #一致性损失的权重
+  consistency_weight: 0.0 #一致性损失的权重
   topk: 50
   cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
