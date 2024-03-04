@@ -47,7 +47,7 @@ class KITTI_METRIC(BaseMetric):
             f.close()
 
     def kitti_evaluate(self):
-        results_dir = os.path.join(self.output_dir, 'outputs', 'data')
+        results_dir = os.path.join(self.output_dir, 'data')
         assert os.path.exists(results_dir)
         result =self.dataloader["dataset"].eval(results_dir=results_dir, logger=self.logger)
         return result

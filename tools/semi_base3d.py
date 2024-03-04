@@ -8,7 +8,7 @@ from torch import Tensor
 from torchvision.transforms import ToPILImage
 import numpy as np
 from .misc import (filter_gt_instances, rename_loss_dict,
-                                reweight_loss_dict)
+                   reweight_loss_dict)
 # from mmdet3d.registry import MODELS
 from mmengine import MessageHub
 # from mmdet3d.utils import ConfigType, OptConfigType, OptMultiConfig, SampleList
@@ -16,18 +16,22 @@ from mmengine.model import BaseModel
 # from mmdet3d.models import Base3DDetector
 from lib.helpers.model_helper import build_model
 from tools.Semi_Mono_DETR import Semi_Mono_DETR
-def prepare_targets(targets, batch_size):
-        targets_list = []
-        mask = targets['mask_2d']
 
-        key_list = ['labels', 'boxes', 'calibs', 'depth', 'size_3d', 'heading_bin', 'heading_res', 'boxes_3d']
-        for bz in range(batch_size):
-            target_dict = {}
-            for key, val in targets.items():
-                if key in key_list:
-                    target_dict[key] = val[bz][mask[bz]]
-            targets_list.append(target_dict)
-        return targets_list
+
+def prepare_targets(targets, batch_size):
+    targets_list = []
+    mask = targets['mask_2d']
+
+    key_list = ['labels', 'boxes', 'calibs', 'depth', 'size_3d', 'heading_bin', 'heading_res', 'boxes_3d']
+    for bz in range(batch_size):
+        target_dict = {}
+        for key, val in targets.items():
+            if key in key_list:
+                target_dict[key] = val[bz][mask[bz]]
+        targets_list.append(target_dict)
+    return targets_list
+
+
 # @MODELS.register_module()
 class SemiBase3DDetector(BaseModel):
     """Base class for semi-supervised detectors.
@@ -54,21 +58,20 @@ class SemiBase3DDetector(BaseModel):
                  cfg,
                  model_cfg,
                  test_loader,
-                 semi_train_cfg= None,
+                 semi_train_cfg=None,
                  semi_test_cfg=None,
                  init_cfg=None) -> None:
-        super().__init__(data_preprocessor=None,init_cfg=init_cfg)
+        super().__init__(data_preprocessor=None, init_cfg=init_cfg)
         # build model
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
-        self.student =Semi_Mono_DETR(student_model, student_loss,cfg,test_loader)
-        self.teacher =Semi_Mono_DETR(teacher_model, teacher_loss,cfg,test_loader)
+        self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader)
+        self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader)
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
-        self.sup_size=semi_train_cfg["sup_size"]
+        self.sup_size = semi_train_cfg["sup_size"]
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
-        
 
     def forward(self, inputs, calibs, targets, info, mode):
         """The unified entry for a forward process in both training and test.
@@ -126,7 +129,7 @@ class SemiBase3DDetector(BaseModel):
         else:
             raise RuntimeError(f'Invalid mode "{mode}". '
                                'Only supports loss, predict and tensor mode')
-        
+
     @staticmethod
     def freeze(model: nn.Module):
         """Freeze the model."""
@@ -147,7 +150,8 @@ class SemiBase3DDetector(BaseModel):
         Returns:
             dict: A dictionary of loss components
         """
-        sup_inputs,student_inputs,teacher_inputs=inputs[0][:self.sup_size],inputs[0][self.sup_size:],inputs[1][self.sup_size:]
+        sup_inputs, student_inputs, teacher_inputs = inputs[0][:self.sup_size], inputs[0][self.sup_size:], inputs[1][
+                                                                                                           self.sup_size:]
         # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
         # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
         # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
@@ -158,30 +162,30 @@ class SemiBase3DDetector(BaseModel):
         # teacher_image=ToPILImage()(np.round(teacher_image).astype(np.uint8))
         # student_image.save("student_image.jpg")
         # teacher_image.save("teacher_image.jpg")
-        sup_calibs,unsup_calibs=calibs[:self.sup_size],calibs[self.sup_size:]
-        sup_targets={k:v[:self.sup_size] for k,v in targets.items()}
-        unsup_targets={k:v[self.sup_size:] for k,v in targets.items()}
-        sup_info={k:v[:self.sup_size] for k,v in info.items()}
-        unsup_info={k:v[self.sup_size:] for k,v in info.items()}
+        sup_calibs, unsup_calibs = calibs[:self.sup_size], calibs[self.sup_size:]
+        sup_targets = {k: v[:self.sup_size] for k, v in targets.items()}
+        unsup_targets = {k: v[self.sup_size:] for k, v in targets.items()}
+        sup_info = {k: v[:self.sup_size] for k, v in info.items()}
+        unsup_info = {k: v[self.sup_size:] for k, v in info.items()}
         losses = dict()
         losses.update(**self.loss_by_gt_instances(
-            sup_inputs,sup_calibs,sup_targets,sup_info))
-        labels=unsup_targets["labels"]
-        masks=unsup_targets["mask_2d"]
+            sup_inputs, sup_calibs, sup_targets, sup_info))
+        labels = unsup_targets["labels"]
+        masks = unsup_targets["mask_2d"]
         unsup_gt_instances_num = sum([
             len(label[mask])
-            for label,mask in zip(labels,masks)
-         ])
+            for label, mask in zip(labels, masks)
+        ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        pseudo_targets_list,mask,cls_score= self.get_pseudo_targets(
-            teacher_inputs,unsup_calibs,unsup_targets,unsup_info)
-        #unsup_gt_targets_list=prepare_targets(unsup_targets, student_inputs.shape[0])
+        pseudo_targets_list, mask, cls_score = self.get_pseudo_targets(
+            teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
+        unsup_gt_targets_list=prepare_targets(unsup_targets, student_inputs.shape[0])
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs,unsup_calibs,pseudo_targets_list,mask,cls_score,unsup_info))
+            student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
         return losses
 
-    def loss_by_gt_instances(self, 
+    def loss_by_gt_instances(self,
                              sup_inputs,
                              sup_calibs,
                              sup_targets,
@@ -200,12 +204,12 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
 
-        losses = self.student.forward(sup_inputs,sup_calibs,sup_targets,sup_info,mode='loss')
+        losses = self.student.forward(sup_inputs, sup_calibs, sup_targets, sup_info, mode='loss')
         sup_weight = self.semi_train_cfg.get('sup_weight', 1.)
         return rename_loss_dict('sup_', reweight_loss_dict(losses, sup_weight))
 
     def loss_by_pseudo_instances(self,
-                                 unsup_inputs,unsup_calibs,pseudo_targets_list,mask,cls_score,unsup_info) -> dict:
+                                 unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info) -> dict:
         """Calculate losses from a batch of inputs and pseudo data samples.
 
         Args:
@@ -222,31 +226,32 @@ class SemiBase3DDetector(BaseModel):
         Returns:
             dict: A dictionary of loss components
         """
-        losses = self.student.forward(unsup_inputs,unsup_calibs,pseudo_targets_list,unsup_info,mode='unsup_loss')
+        losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
             len(pseudo_targets["labels"])
             for pseudo_targets in pseudo_targets_list
-         ])
+        ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
         unsup_weight = self.semi_train_cfg.get(
             'unsup_weight', 1.) if unsup_pseudo_instances_num > 0 else 0.
-        losses=reweight_loss_dict(losses, unsup_weight)
-       
-        #与教师模型每一层的输出计算一致性损失
-        #consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
-        #不加一致性损失
-        #consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
-        #与教师模型最后一层的输出计算一致性损失
-        consistency_loss=self.consistency_loss(self.student.model.hs[[2]],self.teacher.model.hs[[2]],mask,cls_score,self.student.loss.indices)
-       
-        losses.update({"consistency_loss":consistency_loss*self.semi_train_cfg.get(
+        losses = reweight_loss_dict(losses, unsup_weight)
+
+        # 与教师模型每一层的输出计算一致性损失
+        # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
+        # 不加一致性损失
+        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        # 与教师模型最后一层的输出计算一致性损失
+        # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
+        #                                          cls_score, self.student.loss.indices)
+
+        losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
             'consistency_weight', 1.)})
-        unsup_loss_dict=rename_loss_dict('unsup_',
-                                losses)
+        unsup_loss_dict = rename_loss_dict('unsup_',
+                                           losses)
         for name, loss in unsup_loss_dict.items():
             if 'loss_depth' in name:
-                unsup_loss_dict[name]=unsup_loss_dict[name]*0.
+                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
 
     def consistency_loss(self,
@@ -255,43 +260,45 @@ class SemiBase3DDetector(BaseModel):
                          masks,
                          cls_score_list,
                          idx):
-        consistency_loss=torch.tensor(0.).to(student_decoder_outputs.device)
-        batchsize=student_decoder_outputs.shape[1]
-        levels=student_decoder_outputs.shape[0]
+        consistency_loss = torch.tensor(0.).to(student_decoder_outputs.device)
+        batchsize = student_decoder_outputs.shape[1]
+        levels = student_decoder_outputs.shape[0]
         for i in range(batchsize):
-            student_decoder_output=student_decoder_outputs[:,i,:,:]
-            teacher_decoder_output=teacher_decoder_outputs[:,i,:,:]
-            mask=masks[i]
-            cls_score=cls_score_list[i]
-            if mask.sum()==0:
-                consistency_loss+=0.0
+            student_decoder_output = student_decoder_outputs[:, i, :, :]
+            teacher_decoder_output = teacher_decoder_outputs[:, i, :, :]
+            mask = masks[i]
+            cls_score = cls_score_list[i]
+            if mask.sum() == 0:
+                consistency_loss += 0.0
             else:
-                teacher_decoder_output=teacher_decoder_output[:,mask,:]
+                teacher_decoder_output = teacher_decoder_output[:, mask, :]
                 for level in range(levels):
-                    indices=idx[level][i]
-                    student_decoder_output_level=student_decoder_output[level]
-                    teacher_decoder_output_level=teacher_decoder_output[level]
-                    student_decoder_output_level=student_decoder_output_level[indices[0]]
-                    teacher_decoder_output_level=teacher_decoder_output_level[indices[1]]
+                    indices = idx[level][i]
+                    student_decoder_output_level = student_decoder_output[level]
+                    teacher_decoder_output_level = teacher_decoder_output[level]
+                    student_decoder_output_level = student_decoder_output_level[indices[0]]
+                    teacher_decoder_output_level = teacher_decoder_output_level[indices[1]]
                     # cls_score_level=torch.ones_like(cls_score[mask][indices[1]].unsqueeze(1))
-                    cls_score_level=cls_score[mask][indices[1]].unsqueeze(1)
-                    delta=student_decoder_output_level-teacher_decoder_output_level.detach()
-                    delta=delta.square()
-                    consistency=delta*cls_score_level
-                    a=consistency.mean()
-                    b=torch.nn.functional.mse_loss(student_decoder_output_level,teacher_decoder_output_level.detach())   
-                    consistency_loss+=b
-        consistency_loss=consistency_loss/levels/batchsize
+                    cls_score_level = cls_score[mask][indices[1]].unsqueeze(1)
+                    delta = student_decoder_output_level - teacher_decoder_output_level.detach()
+                    delta = delta.square()
+                    consistency = delta * cls_score_level
+                    a = consistency.mean()
+                    b = torch.nn.functional.mse_loss(student_decoder_output_level,
+                                                     teacher_decoder_output_level.detach())
+                    consistency_loss += b
+        consistency_loss = consistency_loss / levels / batchsize
         return consistency_loss
+
     @torch.no_grad()
     def get_pseudo_targets(
-            self,unsup_inputs,unsup_calibs,unsup_targets,unsup_info
+            self, unsup_inputs, unsup_calibs, unsup_targets, unsup_info
     ):
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
-        pseudo_targets_list,mask,cls_score= self.teacher.forward(
-            unsup_inputs,unsup_calibs,unsup_targets,unsup_info,mode='get_pseudo_targets')
-        return pseudo_targets_list,mask,cls_score
+        pseudo_targets_list, mask, cls_score = self.teacher.forward(
+            unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
+        return pseudo_targets_list, mask, cls_score
 
     def project_pseudo_instances(self, batch_pseudo_instances,
                                  batch_data_samples):
@@ -302,7 +309,7 @@ class SemiBase3DDetector(BaseModel):
                 pseudo_instances.gt_instances)
             data_samples.gt_instances_3d = copy.deepcopy(
                 pseudo_instances.pred_instances_3d)
-            #data_samples.gt_instances.bboxes = bbox_project(
+            # data_samples.gt_instances.bboxes = bbox_project(
             #     data_samples.gt_instances.bboxes,
             #     torch.tensor(data_samples.homography_matrix).to(
             #         self.data_preprocessor.device), data_samples.img_shape)
@@ -385,15 +392,15 @@ class SemiBase3DDetector(BaseModel):
         """Add teacher and student prefixes to model parameter names."""
         # 判断state_dict中是否包含'student'或'teacher'
         if not any([
-                'student' in key or 'teacher' in key
-                for key in state_dict.keys()
+            'student' in key or 'teacher' in key
+            for key in state_dict.keys()
         ]):
-            state_dict=state_dict["model_state"]
+            state_dict = state_dict["model_state"]
             # 将state_dict中的参数名添加'teacher.'前缀
             keys = list(state_dict.keys())
-            state_dict.update({'teacher.' +"model." + k: state_dict[k] for k in keys})
+            state_dict.update({'teacher.' + "model." + k: state_dict[k] for k in keys})
             # 将state_dict中的参数名添加'student.'前缀
-            state_dict.update({'student.'+ "model." + k: state_dict[k] for k in keys})
+            state_dict.update({'student.' + "model." + k: state_dict[k] for k in keys})
             # 删除state_dict中不包含'teacher.'或'student.'的参数名
             for k in keys:
                 state_dict.pop(k)
