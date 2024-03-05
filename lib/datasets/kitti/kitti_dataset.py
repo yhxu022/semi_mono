@@ -62,7 +62,7 @@ class KITTI_Dataset(data.Dataset):
         self.label_dir = os.path.join(self.data_dir, 'label_2')
 
         # data augmentation configuration
-        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled',"semi_unlabeled"] else False
+        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled',"semi_unlabeled",'sup_partial'] else False
 
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
