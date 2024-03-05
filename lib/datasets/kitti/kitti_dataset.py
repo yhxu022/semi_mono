@@ -46,10 +46,10 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled',"semi_unlabeled"]
+        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled',"semi_unlabeled",'sup_partial']
         if self.split in ['train', 'val', 'trainval', 'test']:
             self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
-        elif self.split=="semi_labeled":
+        elif self.split in ["semi_labeled","sup_partial"]:
             self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}.txt')
         elif self.split=="semi_unlabeled":
             self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}-unlabeled.txt')

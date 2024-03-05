@@ -1,9 +1,8 @@
-import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
-from tools.Semi_KITTI import Semi_KITTI
 from torch.utils.data import ConcatDataset
+from torch.utils.data.sampler import RandomSampler
 from tools.semi_sampler import Semi_Sampler
 # init datasets and dataloaders
 def my_worker_init_fn(worker_id):
@@ -11,20 +10,25 @@ def my_worker_init_fn(worker_id):
 def build_dataloader(cfg, workers=16):
     # perpare dataset
     if cfg['type'] == 'KITTI':
-        labeled_dataset = KITTI_Dataset(split=cfg['train_split']+"_labeled", cfg=cfg)
-        unlabeled_dataset = KITTI_Dataset(split=cfg['train_split']+"_unlabeled", cfg=cfg)
-        train_set=ConcatDataset([labeled_dataset,unlabeled_dataset])
+        if cfg['train_split'] == 'semi':
+            labeled_dataset = KITTI_Dataset(split=cfg['train_split']+"_labeled", cfg=cfg)
+            unlabeled_dataset = KITTI_Dataset(split=cfg['train_split']+"_unlabeled", cfg=cfg)
+            train_set=ConcatDataset([labeled_dataset,unlabeled_dataset])
+            sampler=Semi_Sampler(len(labeled_dataset),len(unlabeled_dataset),cfg['batch_size'],cfg['sup_size'])
+        else:
+            train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)
+            sampler=RandomSampler(train_set, replacement=True, num_samples=800000)
         test_set = KITTI_Dataset(split=cfg['test_split'], cfg=cfg)
     else:
         raise NotImplementedError("%s dataset is not supported" % cfg['type'])
-    test_loader = DataLoader(dataset=test_set,
-                             batch_size=4,
-                             num_workers=8,
-                             worker_init_fn=my_worker_init_fn,
-                             shuffle=False,
-                             pin_memory=True,
-                             drop_last=False,
-                             persistent_workers=True)
+    # test_loader = DataLoader(dataset=test_set,
+    #                          batch_size=4,
+    #                          num_workers=8,
+    #                          worker_init_fn=my_worker_init_fn,
+    #                          shuffle=False,
+    #                          pin_memory=True,
+    #                          drop_last=False,
+    #                          persistent_workers=True)
     test_dataloader=dict(
         batch_size=4,
         sampler=dict(
@@ -36,4 +40,4 @@ def build_dataloader(cfg, workers=16):
         collate_fn=dict(type='default_collate'),
         persistent_workers=True
     )
-    return train_set, test_dataloader, Semi_Sampler(len(labeled_dataset),len(unlabeled_dataset),cfg['batch_size'],cfg['sup_size'])
+    return train_set, test_dataloader, sampler
