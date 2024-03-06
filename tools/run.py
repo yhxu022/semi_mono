@@ -21,7 +21,8 @@ from mmengine.logging import MMLogger
 from tools.semi_base3d import SemiBase3DDetector
 from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
-
+from tools.mean_teacher_hook import MeanTeacherHook
+from loops import TeacherStudentValLoop
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
