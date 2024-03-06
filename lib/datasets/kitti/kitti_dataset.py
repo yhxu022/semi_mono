@@ -3,6 +3,7 @@ import numpy as np
 import torch.utils.data as data
 from PIL import Image, ImageFile
 import random
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from lib.datasets.utils import angle2class
 from lib.datasets.utils import gaussian_radius
@@ -37,8 +38,8 @@ class KITTI_Dataset(data.Dataset):
         self.meanshape = cfg.get('meanshape', False)
         self.class_merging = cfg.get('class_merging', False)
         self.use_dontcare = cfg.get('use_dontcare', False)
-        self.fold=cfg.get('fold')
-        self.percent=cfg.get('percent')
+        self.fold = cfg.get('fold')
+        self.percent = cfg.get('percent')
 
         if self.class_merging:
             self.writelist.extend(['Van', 'Truck'])
@@ -46,13 +47,14 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled',"semi_unlabeled",'sup_partial']
+        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial']
         if self.split in ['train', 'val', 'trainval', 'test']:
             self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
-        elif self.split in ["semi_labeled","sup_partial"]:
+        elif self.split in ["semi_labeled", "sup_partial"]:
             self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}.txt')
-        elif self.split=="semi_unlabeled":
-            self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}-unlabeled.txt')
+        elif self.split == "semi_unlabeled":
+            self.split_file = os.path.join(self.root_dir, 'semi_sets',
+                                           f'train.{self.fold}@{self.percent}-unlabeled.txt')
         self.idx_list = [x.strip() for x in open(self.split_file).readlines()]
 
         # path configuration
@@ -62,7 +64,8 @@ class KITTI_Dataset(data.Dataset):
         self.label_dir = os.path.join(self.data_dir, 'label_2')
 
         # data augmentation configuration
-        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled',"semi_unlabeled",'sup_partial'] else False
+        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
+                                                   'sup_partial'] else False
 
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
@@ -78,9 +81,9 @@ class KITTI_Dataset(data.Dataset):
         # statistics
         self.mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         self.std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        self.cls_mean_size = np.array([[1.76255119    ,0.66068622   , 0.84422524   ],
-                                       [1.52563191462 ,1.62856739989, 3.88311640418],
-                                       [1.73698127    ,0.59706367   , 1.76282397   ]])
+        self.cls_mean_size = np.array([[1.76255119, 0.66068622, 0.84422524],
+                                       [1.52563191462, 1.62856739989, 3.88311640418],
+                                       [1.73698127, 0.59706367, 1.76282397]])
         if not self.meanshape:
             self.cls_mean_size = np.zeros_like(self.cls_mean_size, dtype=np.float32)
 
@@ -92,7 +95,7 @@ class KITTI_Dataset(data.Dataset):
     def get_image(self, idx):
         img_file = os.path.join(self.image_dir, '%06d.png' % idx)
         assert os.path.exists(img_file)
-        return Image.open(img_file)    # (H, W, 3) RGB mode
+        return Image.open(img_file)  # (H, W, 3) RGB mode
 
     def get_label(self, idx):
         label_file = os.path.join(self.label_dir, '%06d.txt' % idx)
@@ -111,7 +114,7 @@ class KITTI_Dataset(data.Dataset):
         dt_annos = kitti.get_label_annos(results_dir)
         gt_annos = kitti.get_label_annos(self.label_dir, img_ids)
 
-        test_id = {'Car': 0, 'Pedestrian':1, 'Cyclist': 2}
+        test_id = {'Car': 0, 'Pedestrian': 1, 'Cyclist': 2}
 
         logger.info('==> Evaluating (official) ...')
         car_moderate = 0
@@ -130,11 +133,11 @@ class KITTI_Dataset(data.Dataset):
         index = int(self.idx_list[item])  # index mapping, get real data id
         # image loading
         img = self.get_image(index)
-        #img.save("origin.jpg")
-        if self.split=="semi_unlabeled":
+        # img.save("origin.jpg")
+        if self.split == "semi_unlabeled":
             weak_img = self.get_image(index)
         img_size = np.array(img.size)
-        features_size = self.resolution // self.downsample    # W * H
+        features_size = self.resolution // self.downsample  # W * H
 
         # data augmentation for image
         center = np.array(img_size) / 2
@@ -151,9 +154,9 @@ class KITTI_Dataset(data.Dataset):
             if np.random.random() < self.random_flip:
                 random_flip_flag = True
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
-                if self.split=="semi_unlabeled":
-                    weak_img=weak_img.transpose(Image.FLIP_LEFT_RIGHT)
-            
+                if self.split == "semi_unlabeled":
+                    weak_img = weak_img.transpose(Image.FLIP_LEFT_RIGHT)
+
             if self.aug_crop:
                 if np.random.random() < self.random_crop:
                     random_crop_flag = True
@@ -168,24 +171,24 @@ class KITTI_Dataset(data.Dataset):
                             method=Image.AFFINE,
                             data=tuple(trans_inv.reshape(-1).tolist()),
                             resample=Image.BILINEAR)
-        if self.split=="semi_unlabeled":
-            weak_img=weak_img.transform(tuple(self.resolution.tolist()),
-                            method=Image.AFFINE,
-                            data=tuple(trans_inv.reshape(-1).tolist()),
-                            resample=Image.BILINEAR)
+        if self.split == "semi_unlabeled":
+            weak_img = weak_img.transform(tuple(self.resolution.tolist()),
+                                          method=Image.AFFINE,
+                                          data=tuple(trans_inv.reshape(-1).tolist()),
+                                          resample=Image.BILINEAR)
         # if index==6926:
         #     img.save("result.jpg")
         # image encoding
         img = np.array(img).astype(np.float32) / 255.0
         img = (img - self.mean) / self.std
         img = img.transpose(2, 0, 1)  # C * H * W
-        if self.split=="semi_unlabeled":
+        if self.split == "semi_unlabeled":
             # if index==6926:
             #     weak_img.save("result_weak.jpg")
             #     pass
-            weak_img=np.array(weak_img).astype(np.float32) / 255.0
+            weak_img = np.array(weak_img).astype(np.float32) / 255.0
             weak_img = (weak_img - self.mean) / self.std
-            weak_img=weak_img.transpose(2, 0, 1)
+            weak_img = weak_img.transpose(2, 0, 1)
         info = {'img_id': index,
                 'img_size': img_size,
                 'bbox_downsample_ratio': img_size / features_size}
@@ -204,7 +207,7 @@ class KITTI_Dataset(data.Dataset):
                 calib.flip(img_size)
             for object in objects:
                 [x1, _, x2, _] = object.box2d
-                object.box2d[0],  object.box2d[2] = img_size[0] - x2, img_size[0] - x1
+                object.box2d[0], object.box2d[2] = img_size[0] - x2, img_size[0] - x1
                 object.alpha = np.pi - object.alpha
                 object.ry = np.pi - object.ry
                 if self.aug_calib:
@@ -222,7 +225,7 @@ class KITTI_Dataset(data.Dataset):
         depth = np.zeros((self.max_objs, 1), dtype=np.float32)
         heading_bin = np.zeros((self.max_objs, 1), dtype=np.int64)
         heading_res = np.zeros((self.max_objs, 1), dtype=np.float32)
-        size_2d = np.zeros((self.max_objs, 2), dtype=np.float32) 
+        size_2d = np.zeros((self.max_objs, 2), dtype=np.float32)
         size_3d = np.zeros((self.max_objs, 3), dtype=np.float32)
         src_size_3d = np.zeros((self.max_objs, 3), dtype=np.float32)
         boxes = np.zeros((self.max_objs, 4), dtype=np.float32)
@@ -246,13 +249,14 @@ class KITTI_Dataset(data.Dataset):
 
             # process 2d bbox & get 2d center
             bbox_2d = objects[i].box2d.copy()
-            
+
             # add affine transformation for 2d boxes.
             bbox_2d[:2] = affine_transform(bbox_2d[:2], trans)
             bbox_2d[2:] = affine_transform(bbox_2d[2:], trans)
 
             # process 3d center
-            center_2d = np.array([(bbox_2d[0] + bbox_2d[2]) / 2, (bbox_2d[1] + bbox_2d[3]) / 2], dtype=np.float32)  # W * H
+            center_2d = np.array([(bbox_2d[0] + bbox_2d[2]) / 2, (bbox_2d[1] + bbox_2d[3]) / 2],
+                                 dtype=np.float32)  # W * H
             corner_2d = bbox_2d.copy()
 
             center_3d = objects[i].pos + [0, -objects[i].h / 2, 0]  # real 3D center in 3D space
@@ -266,13 +270,13 @@ class KITTI_Dataset(data.Dataset):
             # filter 3d center out of img
             proj_inside_img = True
 
-            if center_3d[0] < 0 or center_3d[0] >= self.resolution[0]: 
+            if center_3d[0] < 0 or center_3d[0] >= self.resolution[0]:
                 proj_inside_img = False
-            if center_3d[1] < 0 or center_3d[1] >= self.resolution[1]: 
+            if center_3d[1] < 0 or center_3d[1] >= self.resolution[1]:
                 proj_inside_img = False
 
             if proj_inside_img == False:
-                    continue
+                continue
 
             # class
             cls_id = self.cls2id[objects[i].cls_type]
@@ -300,7 +304,7 @@ class KITTI_Dataset(data.Dataset):
                     t = np.clip(t, 0, 1)
                     b = np.clip(b, 0, 1)
                 else:
-                    continue		
+                    continue
 
             boxes[i] = center_2d_norm[0], center_2d_norm[1], size_2d_norm[0], size_2d_norm[1]
             boxes_3d[i] = center_3d_norm[0], center_3d_norm[1], l, r, t, b
@@ -308,10 +312,10 @@ class KITTI_Dataset(data.Dataset):
             # encoding depth
             if self.depth_scale == 'normal':
                 depth[i] = objects[i].pos[-1] * crop_scale
-            
+
             elif self.depth_scale == 'inverse':
                 depth[i] = objects[i].pos[-1] / crop_scale
-            
+
             elif self.depth_scale == 'none':
                 depth[i] = objects[i].pos[-1]
 
@@ -331,23 +335,23 @@ class KITTI_Dataset(data.Dataset):
 
             calibs[i] = calib.P2
         # collect return data
-        inputs = img,img
-        if self.split=="semi_unlabeled":
-            inputs=img,weak_img
+        inputs = img, img
+        if self.split == "semi_unlabeled":
+            inputs = img, weak_img
         targets = {
-                   'calibs': calibs,
-                   'indices': indices,
-                   'img_size': img_size,
-                   'labels': labels,
-                   'boxes': boxes,
-                   'boxes_3d': boxes_3d,
-                   'depth': depth,
-                   'size_2d': size_2d,
-                   'size_3d': size_3d,
-                   'src_size_3d': src_size_3d,
-                   'heading_bin': heading_bin,
-                   'heading_res': heading_res,
-                   'mask_2d': mask_2d}
+            'calibs': calibs,
+            'indices': indices,
+            'img_size': img_size,
+            'labels': labels,
+            'boxes': boxes,
+            'boxes_3d': boxes_3d,
+            'depth': depth,
+            'size_2d': size_2d,
+            'size_3d': size_3d,
+            'src_size_3d': src_size_3d,
+            'heading_bin': heading_bin,
+            'heading_res': heading_res,
+            'mask_2d': mask_2d}
 
         info = {'img_id': index,
                 'img_size': img_size,
@@ -357,9 +361,10 @@ class KITTI_Dataset(data.Dataset):
 
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
+
     cfg = {'root_dir': '../../../data/KITTI',
            'random_flip': 0.0, 'random_crop': 1.0, 'scale': 0.8, 'shift': 0.1, 'use_dontcare': False,
-           'class_merging': False, 'writelist':['Pedestrian', 'Car', 'Cyclist'], 'use_3d_center':False}
+           'class_merging': False, 'writelist': ['Pedestrian', 'Car', 'Cyclist'], 'use_3d_center': False}
     dataset = KITTI_Dataset('train', cfg)
     dataloader = DataLoader(dataset=dataset, batch_size=1)
     print(dataset.writelist)

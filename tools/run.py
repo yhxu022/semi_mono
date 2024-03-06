@@ -61,15 +61,15 @@ def main():
     #     return
     # ipdb.set_trace()
     checkpoint = cfg["trainer"].get("pretrain_model", None)
-    if cfg['dataset']["train_split"]=="semi":
-        if (checkpoint is not None):
+    if cfg['dataset']["train_split"] == "semi":
+        if checkpoint is not None:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
-                                    init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
+                                       init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
         else:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"])
         custom_hooks = [
             dict(type="MeanTeacherHook", momentum=cfg["mean_teacher_hook"]["momentum"],
-                interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
+                 interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
         ]
         runner = Runner(model=model,
                         work_dir=output_path,
@@ -86,25 +86,25 @@ def main():
                         ),
                         # train_dataloader = train_loader,
                         optim_wrapper=dict(optimizer=dict(type=cfg["optimizer"]["type"],
-                                                        lr=cfg["optimizer"]["lr"],
-                                                        weight_decay=cfg["optimizer"]["weight_decay"]
-                                                        ),
-                                        paramwise_cfg=dict(bias_decay_mult=0,
-                                                            bypass_duplicate=True)),
+                                                          lr=cfg["optimizer"]["lr"],
+                                                          weight_decay=cfg["optimizer"]["weight_decay"]
+                                                          ),
+                                           paramwise_cfg=dict(bias_decay_mult=0,
+                                                              bypass_duplicate=True)),
                         param_scheduler=dict(type='MultiStepLR',
-                                            by_epoch=False,
-                                            milestones=cfg["lr_scheduler"]["decay_list"],
-                                            gamma=cfg["lr_scheduler"]["decay_rate"]),
+                                             by_epoch=False,
+                                             milestones=cfg["lr_scheduler"]["decay_list"],
+                                             gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
-                                    max_iters=cfg["trainer"]["max_iteration"],
-                                    val_interval=cfg["trainer"]["val_iterval"]),
+                                       max_iters=cfg["trainer"]["max_iteration"],
+                                       val_interval=cfg["trainer"]["val_iterval"]),
                         val_dataloader=test_loader,
                         val_cfg=dict(type='TeacherStudentValLoop'),
                         val_evaluator=dict(type=KITTI_METRIC,
-                                        output_dir=output_path,
-                                        dataloader=test_loader,
-                                        logger=logger,
-                                        cfg=cfg),
+                                           output_dir=output_path,
+                                           dataloader=test_loader,
+                                           logger=logger,
+                                           cfg=cfg),
                         test_dataloader=test_loader,
                         test_cfg=dict(type='TeacherStudentValLoop'),
                         test_evaluator=dict(type=KITTI_METRIC,
@@ -121,15 +121,15 @@ def main():
                                             save_best="teacher/car_moderate",
                                             rule='greater')),
                         log_processor=dict(window_size=50,
-                                        by_epoch=False,
-                                        custom_cfg=[
-                                            dict(data_src='batch_unsup_pseudo_instances_num',
+                                           by_epoch=False,
+                                           custom_cfg=[
+                                               dict(data_src='batch_unsup_pseudo_instances_num',
                                                     method_name='mean',
                                                     window_size=50),
-                                            dict(data_src='batch_unsup_gt_instances_num',
+                                               dict(data_src='batch_unsup_gt_instances_num',
                                                     method_name='mean',
                                                     window_size=50),
-                                        ]),
+                                           ]),
                         randomness=dict(seed=cfg.get('random_seed', 444),
                                         diff_rank_seed=True,
                                         deterministic=cfg.get('deterministic', False)),
@@ -142,7 +142,7 @@ def main():
     else:
         model, loss = build_model(cfg['model'])
         if (checkpoint is not None):
-            model = Mono_DETR(model, loss, cfg, test_loader,init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
+            model = Mono_DETR(model, loss, cfg, test_loader, init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
         else:
             model = Mono_DETR(model, loss, cfg, test_loader)
         runner = Runner(model=model,
@@ -158,25 +158,25 @@ def main():
                             persistent_workers=True
                         ),
                         optim_wrapper=dict(optimizer=dict(type=cfg["optimizer"]["type"],
-                                                        lr=cfg["optimizer"]["lr"],
-                                                        weight_decay=cfg["optimizer"]["weight_decay"]
-                                                        ),
-                                        paramwise_cfg=dict(bias_decay_mult=0,
-                                                            bypass_duplicate=True)),
+                                                          lr=cfg["optimizer"]["lr"],
+                                                          weight_decay=cfg["optimizer"]["weight_decay"]
+                                                          ),
+                                           paramwise_cfg=dict(bias_decay_mult=0,
+                                                              bypass_duplicate=True)),
                         param_scheduler=dict(type='MultiStepLR',
-                                            by_epoch=False,
-                                            milestones=cfg["lr_scheduler"]["decay_list"],
-                                            gamma=cfg["lr_scheduler"]["decay_rate"]),
+                                             by_epoch=False,
+                                             milestones=cfg["lr_scheduler"]["decay_list"],
+                                             gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
-                                    max_iters=cfg["trainer"]["max_iteration"],
-                                    val_interval=cfg["trainer"]["val_iterval"]),
+                                       max_iters=cfg["trainer"]["max_iteration"],
+                                       val_interval=cfg["trainer"]["val_iterval"]),
                         val_dataloader=test_loader,
                         val_cfg=dict(),
                         val_evaluator=dict(type=KITTI_METRIC,
-                                        output_dir=output_path,
-                                        dataloader=test_loader,
-                                        logger=logger,
-                                        cfg=cfg),
+                                           output_dir=output_path,
+                                           dataloader=test_loader,
+                                           logger=logger,
+                                           cfg=cfg),
                         test_dataloader=test_loader,
                         test_cfg=dict(),
                         test_evaluator=dict(type=KITTI_METRIC,
@@ -193,7 +193,7 @@ def main():
                                             save_best="car_moderate",
                                             rule='greater')),
                         log_processor=dict(window_size=50,
-                                        by_epoch=False),
+                                           by_epoch=False),
                         randomness=dict(seed=cfg.get('random_seed', 444),
                                         diff_rank_seed=True,
                                         deterministic=cfg.get('deterministic', False)),
