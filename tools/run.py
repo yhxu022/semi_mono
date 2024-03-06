@@ -42,7 +42,7 @@ def main():
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     # output_path = os.path.join('./' + cfg["trainer"]['save_path'], model_name)
-    output_path = os.path.join('./' + 'outputs', config_name)
+    output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H'))
     os.makedirs(output_path, exist_ok=True)
     log_file = os.path.join(output_path, 'train.log')
     logger = MMLogger.get_instance('mmengine', log_file=log_file, log_level='INFO')
