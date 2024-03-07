@@ -180,9 +180,9 @@ class SemiBase3DDetector(BaseModel):
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
         pseudo_targets_list, mask, cls_score = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
-        unsup_gt_targets_list=prepare_targets(unsup_targets, student_inputs.shape[0])
+        #unsup_gt_targets_list=prepare_targets(unsup_targets, student_inputs.shape[0])
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
+            student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info))
         return losses
 
     def loss_by_gt_instances(self,
@@ -238,9 +238,9 @@ class SemiBase3DDetector(BaseModel):
         losses = reweight_loss_dict(losses, unsup_weight)
 
         # 与教师模型每一层的输出计算一致性损失
-        # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
+        consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
         # 不加一致性损失
-        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        # consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
         #                                          cls_score, self.student.loss.indices)
@@ -286,7 +286,7 @@ class SemiBase3DDetector(BaseModel):
                     a = consistency.mean()
                     b = torch.nn.functional.mse_loss(student_decoder_output_level,
                                                      teacher_decoder_output_level.detach())
-                    consistency_loss += b
+                    consistency_loss += a
         consistency_loss = consistency_loss / levels / batchsize
         return consistency_loss
 
