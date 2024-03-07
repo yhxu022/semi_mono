@@ -98,9 +98,8 @@ class Backbone(BackboneBase):
                  dilation: bool):
         norm_layer = FrozenBatchNorm2d
         backbone = getattr(torchvision.models, name)(
-            weights='IMAGENET1K_V2',
             replace_stride_with_dilation=[False, False, dilation],
-            norm_layer=norm_layer)
+            pretrained=is_main_process(), norm_layer=norm_layer)
         assert name not in ('resnet18', 'resnet34'), "number of channels are hard coded"
         super().__init__(backbone, train_backbone, return_interm_layers)
         if dilation:
