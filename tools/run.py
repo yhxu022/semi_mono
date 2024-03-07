@@ -12,6 +12,7 @@ sys.path.append(ROOT_DIR)
 import yaml
 import argparse
 import datetime
+import ast
 
 from lib.helpers.dataloader_helper import build_dataloader
 from lib.helpers.tester_helper import Tester
@@ -97,7 +98,10 @@ def main():
                                              gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
-                                       val_interval=cfg["trainer"]["val_iterval"]),
+                                       val_begin=cfg["trainer"].get('val_begin',1),
+                                       val_interval=cfg["trainer"]["val_iterval"],
+                                       dynamic_intervals=ast.literal_eval((cfg["trainer"].get('dynamic_intervals',None)))
+                                    ),
                         val_dataloader=test_loader,
                         val_cfg=dict(type='TeacherStudentValLoop'),
                         val_evaluator=dict(type=KITTI_METRIC,
@@ -169,7 +173,10 @@ def main():
                                              gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
-                                       val_interval=cfg["trainer"]["val_iterval"]),
+                                       val_begin=cfg["trainer"].get('val_begin',1),
+                                       val_interval=cfg["trainer"]["val_iterval"],
+                                       dynamic_intervals=cfg["trainer"].get('dynamic_intervals',None)
+                                    ),
                         val_dataloader=test_loader,
                         val_cfg=dict(),
                         val_evaluator=dict(type=KITTI_METRIC,
