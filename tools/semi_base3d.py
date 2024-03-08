@@ -180,7 +180,12 @@ class SemiBase3DDetector(BaseModel):
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
         pseudo_targets_list, mask, cls_score = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
-        #unsup_gt_targets_list=prepare_targets(unsup_targets, student_inputs.shape[0])
+        # 用伪标签监督
+        # losses.update(**self.loss_by_pseudo_instances(
+        #     student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info))
+
+        # 用GT监督
+        unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         losses.update(**self.loss_by_pseudo_instances(
             student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info))
         return losses
