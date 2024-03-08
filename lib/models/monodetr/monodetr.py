@@ -193,8 +193,12 @@ class MonoDETR(nn.Module):
             if self.training:
                 query_embeds = self.query_embed.weight
             else:
+                inference_group=0
                 # only use one group in inference
-                query_embeds = self.query_embed.weight[:self.num_queries]
+                group_begin=inference_group*self.num_queries
+                group_end=(inference_group+1)*self.num_queries
+                query_embeds = self.query_embed.weight[group_begin:group_end]
+                # query_embeds = self.query_embed.weight[:self.num_queries]
 
         pred_depth_map_logits, depth_pos_embed, weighted_depth, depth_pos_embed_ip = self.depth_predictor(srcs, masks[1], pos[1])
         
