@@ -65,7 +65,7 @@ def main():
     #     return
     # ipdb.set_trace()
     checkpoint = cfg["trainer"].get("pretrain_model", None)
-    if cfg['dataset']["train_split"] in ["semi",'semi_eigen_clean']:
+    if cfg['dataset']["train_split"] in ["semi", 'semi_eigen_clean']:
         if checkpoint is not None:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
                                        init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
