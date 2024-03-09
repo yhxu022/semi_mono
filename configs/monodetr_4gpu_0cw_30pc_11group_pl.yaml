@@ -129,7 +129,7 @@ trainer:
   dynamic_intervals: "[(29000,484),(38280,232)]"
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
-  #pretrain_model: /data/ipad_3d/monocular/MonoDETR_semi_baseline/work_dir/best_teacher_car_moderate_iter_37584.pth
+  pretrain_model: /data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_val_teacher_pretrained@030822/best_teacher_car_moderate_iter_1.pth
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False
   scalar: 5

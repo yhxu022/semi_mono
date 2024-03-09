@@ -70,6 +70,8 @@ class SemiBase3DDetector(BaseModel):
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
         self.sup_size = semi_train_cfg["sup_size"]
+        self.student.pseudo_label_group_num=1
+        self.teacher.pseudo_label_group_num=self.semi_train_cfg["pseudo_label_group_num"]
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
 
@@ -243,9 +245,9 @@ class SemiBase3DDetector(BaseModel):
         losses = reweight_loss_dict(losses, unsup_weight)
 
         # 与教师模型每一层的输出计算一致性损失
-        consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
+        #consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,self.student.loss.indices)
         # 不加一致性损失
-        # consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
         #                                          cls_score, self.student.loss.indices)
@@ -299,7 +301,6 @@ class SemiBase3DDetector(BaseModel):
     def get_pseudo_targets(
             self, unsup_inputs, unsup_calibs, unsup_targets, unsup_info
     ):
-        self.teacher.pseudo_label_group_num=self.semi_train_cfg["pseudo_label_group_num"]
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
         pseudo_targets_list, mask, cls_score = self.teacher.forward(

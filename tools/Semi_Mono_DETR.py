@@ -68,6 +68,12 @@ class Semi_Mono_DETR(BaseModel):
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
             else:
+                dets = extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+                pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
+                                                                                        self.cfg["semi_train_cfg"][
+                                                                                            "cls_pseudo_thr"],
+                                                                                        self.cfg["semi_train_cfg"][
+                                                                                            "score_pseudo_thr"])
                 pass
             return pseudo_targets_list, mask, cls_score_list
         elif mode == 'unsup_loss':
