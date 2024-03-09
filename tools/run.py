@@ -1,3 +1,4 @@
+import shutil
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -45,6 +46,8 @@ def main():
     # output_path = os.path.join('./' + cfg["trainer"]['save_path'], model_name)
     output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H'))
     os.makedirs(output_path, exist_ok=True)
+    shutil.copy(args.config, output_path)
+    shutil.copy(os.path.join('tools', 'semi_base3d.py'), output_path)
     log_file = os.path.join(output_path, 'train.log')
     logger = MMLogger.get_instance('mmengine', log_file=log_file, log_level='INFO')
     # build dataloader
