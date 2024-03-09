@@ -291,7 +291,7 @@ class SemiBase3DDetector(BaseModel):
                     a = consistency.mean()
                     b = torch.nn.functional.mse_loss(student_decoder_output_level,
                                                      teacher_decoder_output_level.detach())
-                    consistency_loss += a
+                    consistency_loss += b
         consistency_loss = consistency_loss / levels / batchsize
         return consistency_loss
 
