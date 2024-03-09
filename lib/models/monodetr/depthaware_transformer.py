@@ -477,7 +477,7 @@ class DepthAwareDecoderLayer(nn.Module):
         v = tgt.transpose(0, 1)
         num_queries = q.shape[0]
        
-        if self.training:
+        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
             num_noise = num_queries-self.group_num * 50
             num_queries = self.group_num * 50
             q_noise = q[:num_noise].repeat(1,self.group_num, 1)
@@ -494,7 +494,7 @@ class DepthAwareDecoderLayer(nn.Module):
             v = torch.cat([v_noise,v], dim=0)
         
         tgt2 = self.self_attn(q, k, v)[0]
-        if self.training:
+        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
             tgt2 = torch.cat(tgt2.split(bs, dim=1), dim=0).transpose(0, 1)
             
         else:

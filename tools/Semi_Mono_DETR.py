@@ -19,6 +19,8 @@ class Semi_Mono_DETR(BaseModel):
         self.max_objs = dataloader["dataset"].max_objs
 
     def forward(self, inputs, calibs, targets, info, mode):
+        self.model.mode=mode
+        self.model.pseudo_label_group_num=self.pseudo_label_group_num
         if mode == 'loss':
             img_sizes = targets['img_size']
             ##dn
@@ -58,12 +60,15 @@ class Semi_Mono_DETR(BaseModel):
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
-            pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "cls_pseudo_thr"],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "score_pseudo_thr"])
+            if self.pseudo_label_group_num==1:
+                dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+                pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
+                                                                                        self.cfg["semi_train_cfg"][
+                                                                                            "cls_pseudo_thr"],
+                                                                                        self.cfg["semi_train_cfg"][
+                                                                                            "score_pseudo_thr"])
+            else:
+                pass
             return pseudo_targets_list, mask, cls_score_list
         elif mode == 'unsup_loss':
             img_sizes = info['img_size']

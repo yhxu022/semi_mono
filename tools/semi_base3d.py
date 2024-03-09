@@ -299,6 +299,7 @@ class SemiBase3DDetector(BaseModel):
     def get_pseudo_targets(
             self, unsup_inputs, unsup_calibs, unsup_targets, unsup_info
     ):
+        self.teacher.pseudo_label_group_num=self.semi_train_cfg["pseudo_label_group_num"]
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
         pseudo_targets_list, mask, cls_score = self.teacher.forward(

@@ -151,6 +151,8 @@ class MonoDETR(nn.Module):
                - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
         """
+        self.depthaware_transformer.mode=self.mode
+        self.depthaware_transformer.pseudo_label_group_num=self.pseudo_label_group_num
         features, pos = self.backbone(images)
 
         srcs = []
@@ -193,11 +195,14 @@ class MonoDETR(nn.Module):
             if self.training:
                 query_embeds = self.query_embed.weight
             else:
-                inference_group=0
-                # only use one group in inference
-                group_begin=inference_group*self.num_queries
-                group_end=(inference_group+1)*self.num_queries
-                query_embeds = self.query_embed.weight[group_begin:group_end]
+                if self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
+                    query_embeds = self.query_embed.weight                    
+                else:
+                    inference_group=0
+                    # only use one group in inference
+                    group_begin=inference_group*self.num_queries
+                    group_end=(inference_group+1)*self.num_queries
+                    query_embeds = self.query_embed.weight[group_begin:group_end]
                 # query_embeds = self.query_embed.weight[:self.num_queries]
 
         pred_depth_map_logits, depth_pos_embed, weighted_depth, depth_pos_embed_ip = self.depth_predictor(srcs, masks[1], pos[1])
@@ -497,7 +502,10 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
-        group_num = self.group_num if self.training else 1
+        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
+            group_num = self.group_num
+        else:
+            group_num = 1
 
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets, group_num=group_num)
