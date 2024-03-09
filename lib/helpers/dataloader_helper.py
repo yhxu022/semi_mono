@@ -19,6 +19,11 @@ def build_dataloader(cfg, workers=16):
             unlabeled_dataset = KITTI_Dataset(split=cfg['train_split'] + "_unlabeled", cfg=cfg)
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
+        if cfg['train_split'] == 'semi_eigen_clean':
+            labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg)
+            train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
+            sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         else:
             train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)
             sampler = RandomSampler(train_set, replacement=True, num_samples=800000)

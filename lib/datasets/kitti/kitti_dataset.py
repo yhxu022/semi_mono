@@ -47,8 +47,8 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial']
-        if self.split in ['train', 'val', 'trainval', 'test']:
+        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial','semi_eigen_clean']
+        if self.split in ['train', 'val', 'trainval', 'test', "semi_eigen_clean"]:
             self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
         elif self.split in ["semi_labeled", "sup_partial"]:
             self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}.txt')
@@ -58,14 +58,19 @@ class KITTI_Dataset(data.Dataset):
         self.idx_list = [x.strip() for x in open(self.split_file).readlines()]
 
         # path configuration
-        self.data_dir = os.path.join(self.root_dir, 'testing' if split == 'test' else 'training')
+        if self.split =='test':
+            self.data_dir = os.path.join(self.root_dir, 'testing' )
+        elif self.split == "semi_eigen_clean":
+            self.data_dir = os.path.join(self.root_dir, "eigen_clean" )
+        else:
+            self.data_dir = os.path.join(self.root_dir, 'training')
         self.image_dir = os.path.join(self.data_dir, 'image_2')
         self.calib_dir = os.path.join(self.data_dir, 'calib')
         self.label_dir = os.path.join(self.data_dir, 'label_2')
 
         # data augmentation configuration
         self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-                                                   'sup_partial'] else False
+                                                   'sup_partial',"semi_eigen_clean"] else False
 
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
@@ -93,7 +98,10 @@ class KITTI_Dataset(data.Dataset):
         self.clip_2d = cfg.get('clip_2d', False)
 
     def get_image(self, idx):
-        img_file = os.path.join(self.image_dir, '%06d.png' % idx)
+        if  self.split == "semi_eigen_clean":
+            img_file = os.path.join(self.image_dir, '%10d.png' % idx)
+        else:
+            img_file = os.path.join(self.image_dir, '%06d.png' % idx)
         assert os.path.exists(img_file)
         return Image.open(img_file)  # (H, W, 3) RGB mode
 
@@ -103,7 +111,10 @@ class KITTI_Dataset(data.Dataset):
         return get_objects_from_label(label_file)
 
     def get_calib(self, idx):
-        calib_file = os.path.join(self.calib_dir, '%06d.txt' % idx)
+        if  self.split == "semi_eigen_clean":
+            calib_file = os.path.join(self.calib_dir, '%10d.txt' % idx)
+        else:
+            calib_file = os.path.join(self.calib_dir, '%06d.txt' % idx)
         assert os.path.exists(calib_file)
         return Calibration(calib_file)
 
@@ -134,7 +145,7 @@ class KITTI_Dataset(data.Dataset):
         # image loading
         img = self.get_image(index)
         # img.save("origin.jpg")
-        if self.split == "semi_unlabeled":
+        if self.split in ["semi_unlabeled","semi_eigen_clean"]:
             weak_img = self.get_image(index)
         img_size = np.array(img.size)
         features_size = self.resolution // self.downsample  # W * H
@@ -154,7 +165,7 @@ class KITTI_Dataset(data.Dataset):
             if np.random.random() < self.random_flip:
                 random_flip_flag = True
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
-                if self.split == "semi_unlabeled":
+                if self.split in ["semi_unlabeled","semi_eigen_clean"]:
                     weak_img = weak_img.transpose(Image.FLIP_LEFT_RIGHT)
 
             if self.aug_crop:
@@ -171,7 +182,7 @@ class KITTI_Dataset(data.Dataset):
                             method=Image.AFFINE,
                             data=tuple(trans_inv.reshape(-1).tolist()),
                             resample=Image.BILINEAR)
-        if self.split == "semi_unlabeled":
+        if self.split in ["semi_unlabeled","semi_eigen_clean"]:
             weak_img = weak_img.transform(tuple(self.resolution.tolist()),
                                           method=Image.AFFINE,
                                           data=tuple(trans_inv.reshape(-1).tolist()),
@@ -182,7 +193,7 @@ class KITTI_Dataset(data.Dataset):
         img = np.array(img).astype(np.float32) / 255.0
         img = (img - self.mean) / self.std
         img = img.transpose(2, 0, 1)  # C * H * W
-        if self.split == "semi_unlabeled":
+        if self.split in ["semi_unlabeled","semi_eigen_clean"]:
             # if index==6926:
             #     weak_img.save("result_weak.jpg")
             #     pass
@@ -336,8 +347,11 @@ class KITTI_Dataset(data.Dataset):
             calibs[i] = calib.P2
         # collect return data
         inputs = img, img
-        if self.split == "semi_unlabeled":
+        if self.split in ["semi_unlabeled","semi_eigen_clean"]:
+            #teacher student采用不同的增强
             inputs = img, weak_img
+            #teacher student采用相同的增强
+            #inputs = img, img
         targets = {
             'calibs': calibs,
             'indices': indices,
