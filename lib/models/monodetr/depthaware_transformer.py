@@ -299,10 +299,13 @@ class DepthAwareTransformer(nn.Module):
             spatial_shapes,
             level_start_index,
             valid_ratios,
+            self.mode,
+            self.pseudo_label_group_num,
             query_embed if (not self.use_dab and not self.two_stage_dino) else None, #,INFo
             mask_flatten,
             depth_pos_embed,
-            mask_depth, bs=bs, depth_pos_embed_ip=depth_pos_embed_ip, pos_embeds=pos_embeds,attn_mask=attn_mask)
+            mask_depth, bs=bs, depth_pos_embed_ip=depth_pos_embed_ip, pos_embeds=pos_embeds,attn_mask=attn_mask
+            )
 
         inter_references_out = inter_references
         inter_references_out_dim = inter_references_dim
@@ -445,6 +448,8 @@ class DepthAwareDecoderLayer(nn.Module):
                 depth_pos_embed,
                 mask_depth, 
                 bs,
+                mode,
+                pseudo_label_group_num,
                 query_sine_embed=None,
                 is_first=None,
                 depth_pos_embed_ip=None,
@@ -477,7 +482,7 @@ class DepthAwareDecoderLayer(nn.Module):
         v = tgt.transpose(0, 1)
         num_queries = q.shape[0]
        
-        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
+        if self.training or mode == 'get_pseudo_targets' and pseudo_label_group_num>1:
             num_noise = num_queries-self.group_num * 50
             num_queries = self.group_num * 50
             q_noise = q[:num_noise].repeat(1,self.group_num, 1)
@@ -494,7 +499,7 @@ class DepthAwareDecoderLayer(nn.Module):
             v = torch.cat([v_noise,v], dim=0)
         
         tgt2 = self.self_attn(q, k, v)[0]
-        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
+        if self.training or mode == 'get_pseudo_targets' and pseudo_label_group_num>1:
             tgt2 = torch.cat(tgt2.split(bs, dim=1), dim=0).transpose(0, 1)
             
         else:
@@ -545,7 +550,7 @@ class DepthAwareDecoder(nn.Module):
         #     self.layers[layer_id + 1].ca_qpos_proj = None
         ###
 
-    def forward(self, tgt, reference_points, src, src_spatial_shapes, src_level_start_index, src_valid_ratios,
+    def forward(self, tgt, reference_points, src, src_spatial_shapes, src_level_start_index, src_valid_ratios, mode, pseudo_label_group_num,
                 query_pos=None, src_padding_mask=None, depth_pos_embed=None, mask_depth=None, bs=None, depth_pos_embed_ip=None, pos_embeds=None, attn_mask=None):
         output = tgt
 
@@ -596,7 +601,8 @@ class DepthAwareDecoder(nn.Module):
                            src_padding_mask,
                            depth_pos_embed,
                            mask_depth, bs,query_sine_embed=None,
-                           is_first=(lid == 0), depth_pos_embed_ip=depth_pos_embed_ip, pos_embeds=pos_embeds, self_attn_mask=attn_mask,query_pos_un=query_pos_un)
+                           is_first=(lid == 0), depth_pos_embed_ip=depth_pos_embed_ip, pos_embeds=pos_embeds, self_attn_mask=attn_mask,query_pos_un=query_pos_un,
+                           mode=mode,pseudo_label_group_num=pseudo_label_group_num)
 
             # hack implementation for iterative bounding box refinement
             if self.bbox_embed is not None:

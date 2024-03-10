@@ -192,17 +192,14 @@ class MonoDETR(nn.Module):
         elif self.two_stage_dino:
             query_embeds = None
         else:
-            if self.training:
+            if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
                 query_embeds = self.query_embed.weight
             else:
-                if self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
-                    query_embeds = self.query_embed.weight                    
-                else:
-                    inference_group=0
-                    # only use one group in inference
-                    group_begin=inference_group*self.num_queries
-                    group_end=(inference_group+1)*self.num_queries
-                    query_embeds = self.query_embed.weight[group_begin:group_end]
+                inference_group=0
+                # only use one group in inference
+                group_begin=inference_group*self.num_queries
+                group_end=(inference_group+1)*self.num_queries
+                query_embeds = self.query_embed.weight[group_begin:group_end]
                 # query_embeds = self.query_embed.weight[:self.num_queries]
 
         pred_depth_map_logits, depth_pos_embed, weighted_depth, depth_pos_embed_ip = self.depth_predictor(srcs, masks[1], pos[1])
@@ -502,7 +499,7 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
         outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
-        if self.training or self.mode == 'get_pseudo_targets' and self.pseudo_label_group_num>1:
+        if self.training:
             group_num = self.group_num
         else:
             group_num = 1

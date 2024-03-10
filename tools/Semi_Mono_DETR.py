@@ -74,7 +74,6 @@ class Semi_Mono_DETR(BaseModel):
                                                                                             "cls_pseudo_thr"],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
-                pass
             return pseudo_targets_list, mask, cls_score_list
         elif mode == 'unsup_loss':
             img_sizes = info['img_size']
