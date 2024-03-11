@@ -178,8 +178,8 @@ def main():
                                        max_iters=cfg["trainer"]["max_iteration"],
                                        val_begin=cfg["trainer"].get('val_begin',1),
                                        val_interval=cfg["trainer"]["val_iterval"],
-                                       dynamic_intervals=cfg["trainer"].get('dynamic_intervals',None)
-                                    ),
+                                       dynamic_intervals=ast.literal_eval((cfg["trainer"].get('dynamic_intervals', 'None')))
+                                       ),
                         val_dataloader=test_loader,
                         val_cfg=dict(),
                         val_evaluator=dict(type=KITTI_METRIC,
