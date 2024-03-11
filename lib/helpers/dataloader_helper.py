@@ -25,6 +25,7 @@ def build_dataloader(cfg, workers=16):
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         else:
+            print(cfg['train_split'])
             train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)
             sampler = RandomSampler(train_set, replacement=True, num_samples=800000)
         test_set = KITTI_Dataset(split=cfg['test_split'], cfg=cfg)

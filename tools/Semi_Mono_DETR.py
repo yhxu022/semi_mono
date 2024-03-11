@@ -76,6 +76,20 @@ class Semi_Mono_DETR(BaseModel):
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
             return pseudo_targets_list, mask, cls_score_list
+
+        elif mode == 'inference':
+            img_sizes = info['img_size']
+            inputs = inputs[0]
+            outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
+            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+            dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
+                                                                                     self.cfg["semi_train_cfg"][
+                                                                                         "cls_pseudo_thr"],
+                                                                                     self.cfg["semi_train_cfg"][
+                                                                                         "score_pseudo_thr"])
+
+            return dets
+
         elif mode == 'unsup_loss':
             img_sizes = info['img_size']
             ##dn
@@ -183,3 +197,37 @@ class Semi_Mono_DETR(BaseModel):
                 self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
             pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
+
+    def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr):
+        mask_list = []
+        cls_score_list = batch_dets[:, :, 1]
+        for bz in range(batch_size):
+            dets = batch_dets[bz]
+            calib = batch_calibs[bz]
+            # target=batch_targets[bz]
+            pseudo_labels = dets[:, 0]
+            mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            for i in range(len(pseudo_labels)):
+                if self.id2cls[int(pseudo_labels[i])] in self.writelist:
+                    mask_cls_type[i] = True
+                if dets[i, 1] > cls_pseudo_thr:
+                    mask_cls_pseudo_thr[i] = True
+                score = dets[i, 1] * dets[i, -1]
+                if score > score_pseudo_thr:
+                    mask_score_pseudo_thr[i] = True
+            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
+            mask_list.append(mask)
+            dets = dets[mask]
+            dets = dets.detach().cpu().numpy()
+            calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
+            info = {key: val.detach().cpu().numpy() for key, val in info.items()}
+            cls_mean_size = self.dataloader["dataset"].cls_mean_size
+            dets = decode_detections(
+                dets=dets,
+                info=info,
+                calibs=calibs,
+                cls_mean_size=cls_mean_size,
+                threshold=self.cfg["tester"].get('threshold', 0.2))
+        return dets

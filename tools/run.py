@@ -14,7 +14,7 @@ import yaml
 import argparse
 import datetime
 import ast
-
+import cv2
 from lib.helpers.dataloader_helper import build_dataloader
 from lib.helpers.tester_helper import Tester
 from tools.KITTI_METRIC import KITTI_METRIC
@@ -25,6 +25,11 @@ from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
 from tools.mean_teacher_hook import MeanTeacherHook
 from loops import TeacherStudentValLoop
+from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
+from visual.kitti_util import Calibration
+from visual.Object_pred import Object3d_pred
+from visual.kitti_object import show_image_with_boxes
+
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
@@ -53,6 +58,29 @@ def main():
     # build dataloader
     train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
 
+    if cfg.get('evaluate_only', False):
+        os.makedirs("outputs_visual", exist_ok=True)
+        index = 1
+        checkpoint = cfg["trainer"].get("pretrain_model", None)
+        unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg)
+        model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
+                                   init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
+
+        inputs, calib, targets, info = unlabeled_dataset[index]
+        image_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/image_2/"
+        calib_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/calib/"
+        img_file_path = os.path.join(image_dir, '{:010d}.png'.format(index))
+        img_from_file = cv2.imread(img_file_path)
+        calib_file_path = os.path.join(calib_dir, '{:010d}.txt'.format(index))
+        calibs_from_file = Calibration(calib_file_path)
+        dets = model.teacher(inputs, calib, targets, info, mode='inference')
+        objects = []
+        for det in dets:
+            object = Object3d_pred(det)
+            objects.append(object)
+        img_bbox2d, img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file)
+        cv2.imwrite('outputs_visual/KITTI.png', img_bbox3d)
+        return
     # if args.evaluate_only:
     #     logger.info('###################  Evaluation Only  ##################')
     #     tester = Tester(cfg=cfg['tester'],

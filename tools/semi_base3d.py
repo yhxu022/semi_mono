@@ -305,6 +305,7 @@ class SemiBase3DDetector(BaseModel):
         self.teacher.eval()
         pseudo_targets_list, mask, cls_score = self.teacher.forward(
             unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
+        print(cls_score)
         return pseudo_targets_list, mask, cls_score
 
     def project_pseudo_instances(self, batch_pseudo_instances,
