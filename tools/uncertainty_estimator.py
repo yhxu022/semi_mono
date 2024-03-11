@@ -33,75 +33,6 @@ class UncertaintyEstimator():
                 best_iou = iou
         return best_index, best_iou
 
-    def prefilter_boxes(self, boxes, scores, labels, weights, thr):
-        # Create dict with boxes stored by its label
-        new_boxes = dict()
-        for t in range(len(boxes)):
-            if len(boxes[t]) != len(scores[t]):
-                print('Error. Length of boxes arrays not equal to length of scores array: {} != {}'.format(len(boxes[t]), len(scores[t])))
-                exit()
-            if len(boxes[t]) != len(labels[t]):
-                print('Error. Length of boxes arrays not equal to length of labels array: {} != {}'.format(len(boxes[t]), len(labels[t])))
-                exit()
-            for j in range(len(boxes[t])):
-                score = scores[t][j]
-                if score < thr:
-                    continue
-                label = int(labels[t][j])
-                box_part = boxes[t][j]
-                x1 = float(box_part[4])
-                y1 = float(box_part[5])
-                x2 = float(box_part[6])
-                y2 = float(box_part[7])
-
-                # Box data checks
-                if x2 < x1:
-                    warnings.warn('X2 < X1 value in box. Swap them.')
-                    x1, x2 = x2, x1
-                if y2 < y1:
-                    warnings.warn('Y2 < Y1 value in box. Swap them.')
-                    y1, y2 = y2, y1
-                if x1 < 0:
-                    warnings.warn('X1 < 0 in box. Set it to 0.')
-                    x1 = 0
-                if x1 > 1:
-                    warnings.warn('X1 > 1 in box. Set it to 1. Check that you normalize boxes in [0, 1] range.')
-                    x1 = 1
-                if x2 < 0:
-                    warnings.warn('X2 < 0 in box. Set it to 0.')
-                    x2 = 0
-                if x2 > 1:
-                    warnings.warn('X2 > 1 in box. Set it to 1. Check that you normalize boxes in [0, 1] range.')
-                    x2 = 1
-                if y1 < 0:
-                    warnings.warn('Y1 < 0 in box. Set it to 0.')
-                    y1 = 0
-                if y1 > 1:
-                    warnings.warn('Y1 > 1 in box. Set it to 1. Check that you normalize boxes in [0, 1] range.')
-                    y1 = 1
-                if y2 < 0:
-                    warnings.warn('Y2 < 0 in box. Set it to 0.')
-                    y2 = 0
-                if y2 > 1:
-                    warnings.warn('Y2 > 1 in box. Set it to 1. Check that you normalize boxes in [0, 1] range.')
-                    y2 = 1
-                if (x2 - x1) * (y2 - y1) == 0.0:
-                    warnings.warn("Zero area box skipped: {}.".format(box_part))
-                    continue
-
-                # [label, score, weight, model index, x1, y1, x2, y2]
-                #['type', 'truncated', 'occluded', 'alpha', 'xmin', 'ymin', 'xmax', 'ymax', 'lx', 'ly', 'lz','dh', 'dw', 'dl', 'ry']
-                # + ['score', weights, 'model index']
-                b = box_part[:-1].tolist() + [box_part[-1] * weights[t], weights[t], t]
-                if label not in new_boxes:
-                    new_boxes[label] = []
-                new_boxes[label].append(b)
-
-        # Sort each list in dict by score and transform it to numpy array
-        for k in new_boxes:
-            current_boxes = np.array(new_boxes[k])
-            new_boxes[k] = current_boxes[current_boxes[:, -3].argsort()[::-1]]
-        return new_boxes
     def get_weighted_box(self, boxes, conf_type='avg'):
         """
         Create weighted box for set of boxes
@@ -158,7 +89,7 @@ class UncertaintyEstimator():
         # + ['score', 'geo_conf', 'model index']
         return box
 
-    def boxes_cluster(self, pseudo_target_dict, dets, iou_thr=0.55, skip_box_thr=0.0, conf_type='avg', allows_overflow=False):
+    def boxes_cluster(self, pseudo_target_dict, dets, iou_thr=0.55, conf_type='avg', allows_overflow=False):
         '''
         :param boxes_list: list of boxes predictions from each model, each box is 4 numbers.
         It has 3 dimensions (models_number, model_preds, 15)
@@ -174,12 +105,6 @@ class UncertaintyEstimator():
         :return: scores: confidence scores
         :return: labels: boxes labels
         '''
-        if weights is None:
-            weights = np.ones(len(boxes_list))
-        if len(weights) != len(boxes_list):
-            print('Warning: incorrect number of weights {}. Must be: {}. Set weights equal to 1.'.format(len(weights), len(boxes_list)))
-            weights = np.ones(len(boxes_list))
-        weights = np.array(weights)
 
         if conf_type not in ['avg', 'max', 'box_and_model_avg', 'absent_model_aware_avg']:
             print('Unknown conf_type: {}. Must be "avg", "max" or "box_and_model_avg", or "absent_model_aware_avg"'.format(conf_type))
