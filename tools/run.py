@@ -9,7 +9,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
-
+import torch
 import yaml
 import argparse
 import datetime
@@ -29,6 +29,8 @@ from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from visual.kitti_util import Calibration
 from visual.Object_pred import Object3d_pred
 from visual.kitti_object import show_image_with_boxes
+from torch.utils.data import DataLoader
+from torch.utils.data import Subset
 
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
@@ -60,26 +62,45 @@ def main():
 
     if cfg.get('evaluate_only', False):
         os.makedirs("outputs_visual", exist_ok=True)
-        index = 1
+        print("start inference and visualize")
         checkpoint = cfg["trainer"].get("pretrain_model", None)
-        unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg)
+        print(f"loading from {checkpoint}")
+        unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg['dataset'])
         model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
-                                   init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
-
-        inputs, calib, targets, info = unlabeled_dataset[index]
-        image_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/image_2/"
-        calib_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/calib/"
-        img_file_path = os.path.join(image_dir, '{:010d}.png'.format(index))
-        img_from_file = cv2.imread(img_file_path)
-        calib_file_path = os.path.join(calib_dir, '{:010d}.txt'.format(index))
-        calibs_from_file = Calibration(calib_file_path)
-        dets = model.teacher(inputs, calib, targets, info, mode='inference')
-        objects = []
-        for det in dets:
-            object = Object3d_pred(det)
-            objects.append(object)
-        img_bbox2d, img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file)
-        cv2.imwrite('outputs_visual/KITTI.png', img_bbox3d)
+                                   init_cfg=dict(type='Pretrained', checkpoint=checkpoint)).to('cuda')
+        ckpt = torch.load(checkpoint)
+        model.load_state_dict(ckpt['state_dict'])
+        # index = 2
+        for index in range(1, 50):
+            subset = Subset(unlabeled_dataset, [index])
+            loader = DataLoader(dataset=subset,
+                                batch_size=1,
+                                num_workers=1,
+                                shuffle=False,
+                                pin_memory=True,
+                                drop_last=False,
+                                persistent_workers=True)
+            for inputs, calib, targets, info in loader:
+                input_teacher = inputs[1]
+                input_teacher = input_teacher.to("cuda")
+                calib = calib.to("cuda")
+                # targets = targets.to("cuda")
+                info['img_size'] = info['img_size'].to("cuda")
+                image_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/image_2/"
+                calib_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/calib/"
+                img_file_path = os.path.join(image_dir, '{:010d}.png'.format(index))
+                img_from_file = cv2.imread(img_file_path)
+                calib_file_path = os.path.join(calib_dir, '{:010d}.txt'.format(index))
+                calibs_from_file = Calibration(calib_file_path)
+                dets = model.teacher(input_teacher, calib, targets, info, mode='inference')
+                objects = []
+                for det in dets:
+                    object = Object3d_pred(det)
+                    objects.append(object)
+                if len(objects) == 0:
+                    print(index)
+                img_bbox2d, img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file)
+                cv2.imwrite(f'outputs_visual/KITTI_{index}.png', img_bbox3d)
         return
     # if args.evaluate_only:
     #     logger.info('###################  Evaluation Only  ##################')
@@ -129,9 +150,10 @@ def main():
                                              gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
-                                       val_begin=cfg["trainer"].get('val_begin',1),
+                                       val_begin=cfg["trainer"].get('val_begin', 1),
                                        val_interval=cfg["trainer"]["val_iterval"],
-                                       dynamic_intervals=ast.literal_eval((cfg["trainer"].get('dynamic_intervals', 'None')))
+                                       dynamic_intervals=ast.literal_eval(
+                                           (cfg["trainer"].get('dynamic_intervals', 'None')))
                                        ),
                         val_dataloader=test_loader,
                         val_cfg=dict(type='TeacherStudentValLoop'),
@@ -204,9 +226,10 @@ def main():
                                              gamma=cfg["lr_scheduler"]["decay_rate"]),
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
-                                       val_begin=cfg["trainer"].get('val_begin',1),
+                                       val_begin=cfg["trainer"].get('val_begin', 1),
                                        val_interval=cfg["trainer"]["val_iterval"],
-                                       dynamic_intervals=ast.literal_eval((cfg["trainer"].get('dynamic_intervals', 'None')))
+                                       dynamic_intervals=ast.literal_eval(
+                                           (cfg["trainer"].get('dynamic_intervals', 'None')))
                                        ),
                         val_dataloader=test_loader,
                         val_cfg=dict(),

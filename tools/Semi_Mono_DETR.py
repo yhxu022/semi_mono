@@ -79,6 +79,7 @@ class Semi_Mono_DETR(BaseModel):
 
         elif mode == 'inference':
             img_sizes = info['img_size']
+
             inputs = inputs[0]
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
             dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
@@ -86,7 +87,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                      self.cfg["semi_train_cfg"][
                                                                                          "cls_pseudo_thr"],
                                                                                      self.cfg["semi_train_cfg"][
-                                                                                         "score_pseudo_thr"])
+                                                                                         "score_pseudo_thr"], info)
 
             return dets
 
@@ -198,7 +199,7 @@ class Semi_Mono_DETR(BaseModel):
             pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
 
-    def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr):
+    def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr, info):
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
@@ -220,6 +221,7 @@ class Semi_Mono_DETR(BaseModel):
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
+            dets = dets.unsqueeze(0)
             dets = dets.detach().cpu().numpy()
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
@@ -230,4 +232,5 @@ class Semi_Mono_DETR(BaseModel):
                 calibs=calibs,
                 cls_mean_size=cls_mean_size,
                 threshold=self.cfg["tester"].get('threshold', 0.2))
-        return dets
+            dets_img = dets[int(info['img_id'])]
+        return dets_img

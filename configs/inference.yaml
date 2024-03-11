@@ -127,7 +127,7 @@ trainer:
   val_iterval: 232
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
-  #pretrain_model: /data/ipad_3d/monocular/MonoDETR_semi_baseline/work_dir/best_teacher_car_moderate_iter_37584.pth
+  pretrain_model: /home/xyh/MonoDETR_semi_baseline_33/ckpts/best_teacher_car_moderate_iter_41296.pth
   save_path: 'outputs2/'
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False

@@ -13,7 +13,7 @@ import cv2
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, "mayavi"))
-import kitti_util as utils
+import visual.kitti_util as utils
 import argparse
 
 try:
