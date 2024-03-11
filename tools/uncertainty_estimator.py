@@ -9,13 +9,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
 
-from mmdet3d.core.bbox.iou_calculators.iou3d_calculator import BboxOverlaps3D
+# from mmdet3d.core.bbox.iou_calculators.iou3d_calculator import BboxOverlaps3D
 
 # 初始化UncertaintyEstimator类
 class UncertaintyEstimator():
     def __init__(self):
         super(UncertaintyEstimator, self).__init__()
-        self.iou_calculator = BboxOverlaps3D(coordinate="camera")
+        # self.iou_calculator = BboxOverlaps3D(coordinate="camera")
 
     def find_matching_box(self, boxes_list, new_box, match_iou):
         '''
@@ -158,7 +158,7 @@ class UncertaintyEstimator():
         # + ['score', 'geo_conf', 'model index']
         return box
 
-    def boxes_cluster(self, boxes_list, scores_list, labels_list, iou_thr=0.55, skip_box_thr=0.0, conf_type='avg', allows_overflow=False):
+    def boxes_cluster(self, pseudo_target_dict, dets, iou_thr=0.55, skip_box_thr=0.0, conf_type='avg', allows_overflow=False):
         '''
         :param boxes_list: list of boxes predictions from each model, each box is 4 numbers.
         It has 3 dimensions (models_number, model_preds, 15)

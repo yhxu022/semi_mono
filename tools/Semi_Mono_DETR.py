@@ -179,6 +179,7 @@ class Semi_Mono_DETR(BaseModel):
                     heading_ress = torch.cat((heading_ress, heading_res.unsqueeze(0)), dim=0)
             pseudo_target_dict["heading_bin"] = heading_bins
             pseudo_target_dict["heading_res"] = heading_ress
-            self.uncertainty_estimator.boxes_cluster(pseudo_target_dict)
-            pseudo_targets_list.append(pseudo_target_dict,dets)
+            if self.pseudo_label_group_num>1:
+                self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
+            pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
