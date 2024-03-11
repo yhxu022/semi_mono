@@ -3,11 +3,12 @@ import torch
 from lib.helpers.decode_helper import extract_dets_from_outputs
 from lib.helpers.decode_helper import decode_detections
 import numpy as np
-
+from uncertainty_estimator import UncertaintyEstimator
 
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader):
         super().__init__()
+        self.uncertainty_estimator=UncertaintyEstimator()
         self.model = model
         self.loss = loss
         self.cfg = cfg
@@ -165,7 +166,6 @@ class Semi_Mono_DETR(BaseModel):
             t, b = y3d - corner_2d[1], corner_2d[3] - y3d
             boxes_3d = torch.cat((x3d, y3d, l, r, t, b), dim=1)
             pseudo_target_dict["boxes_3d"] = boxes_3d
-
             for i in range(len(pseudo_labels)):
                 heading = dets[i, 7:31]
                 heading_bin, heading_res = heading[0:12], heading[12:24]
@@ -179,5 +179,6 @@ class Semi_Mono_DETR(BaseModel):
                     heading_ress = torch.cat((heading_ress, heading_res.unsqueeze(0)), dim=0)
             pseudo_target_dict["heading_bin"] = heading_bins
             pseudo_target_dict["heading_res"] = heading_ress
-            pseudo_targets_list.append(pseudo_target_dict)
+            self.uncertainty_estimator.boxes_cluster(pseudo_target_dict)
+            pseudo_targets_list.append(pseudo_target_dict,dets)
         return pseudo_targets_list, mask_list, cls_score_list
