@@ -1,6 +1,8 @@
 import shutil
 import warnings
 
+import numpy as np
+
 warnings.filterwarnings("ignore")
 
 import os
@@ -28,10 +30,11 @@ from loops import TeacherStudentValLoop
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from visual.kitti_util import Calibration
 from visual.Object_pred import Object3d_pred
-from visual.kitti_object import show_image_with_boxes
+from visual.kitti_object import show_image_with_boxes, show_lidar_topview_with_boxes
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
-
+import time
+from tqdm import tqdm
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
@@ -57,63 +60,92 @@ def main():
     shutil.copy(os.path.join('tools', 'semi_base3d.py'), output_path)
     log_file = os.path.join(output_path, 'train.log')
     logger = MMLogger.get_instance('mmengine', log_file=log_file, log_level='INFO')
-    # build dataloader
-    train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
+    checkpoint = cfg["trainer"].get("pretrain_model", None)
 
     if cfg.get('evaluate_only', False):
         os.makedirs("outputs_visual", exist_ok=True)
         print("start inference and visualize")
-        checkpoint = cfg["trainer"].get("pretrain_model", None)
         print(f"loading from {checkpoint}")
-        unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg['dataset'])
-        model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
-                                   init_cfg=dict(type='Pretrained', checkpoint=checkpoint)).to('cuda')
-        ckpt = torch.load(checkpoint)
-        model.load_state_dict(ckpt['state_dict'])
-        # index = 2
-        for index in range(1, 50):
-            subset = Subset(unlabeled_dataset, [index])
-            loader = DataLoader(dataset=subset,
+        unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
+        subset = Subset(unlabeled_dataset, range(100))
+        loader = DataLoader(dataset=subset,
                                 batch_size=1,
                                 num_workers=1,
                                 shuffle=False,
                                 pin_memory=True,
                                 drop_last=False,
                                 persistent_workers=True)
-            for inputs, calib, targets, info in loader:
-                input_teacher = inputs[1]
-                input_teacher = input_teacher.to("cuda")
-                calib = calib.to("cuda")
-                # targets = targets.to("cuda")
-                info['img_size'] = info['img_size'].to("cuda")
-                image_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/image_2/"
-                calib_dir = "/home/xyh/MonoDETR_ori/data/KITTI/eigen_clean/calib/"
-                img_file_path = os.path.join(image_dir, '{:010d}.png'.format(index))
-                img_from_file = cv2.imread(img_file_path)
-                calib_file_path = os.path.join(calib_dir, '{:010d}.txt'.format(index))
-                calibs_from_file = Calibration(calib_file_path)
-                dets = model.teacher(input_teacher, calib, targets, info, mode='inference')
-                objects = []
-                for det in dets:
-                    object = Object3d_pred(det)
-                    objects.append(object)
-                if len(objects) == 0:
-                    print(index)
-                img_bbox2d, img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file)
-                cv2.imwrite(f'outputs_visual/KITTI_{index}.png', img_bbox3d)
+        model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"], inference_set=subset.dataset).to('cuda')
+        if checkpoint is not None:
+            ckpt = torch.load(checkpoint)
+            model.load_state_dict(ckpt['state_dict'])
+        gt_sum=sum=0
+        for inputs, calib, targets, info in tqdm(loader):
+            input_teacher = inputs[1]
+            input_teacher = input_teacher.to("cuda")
+            calib = calib.to("cuda")
+            # targets = targets.to("cuda")
+            id=int(info['img_id'])
+            info['img_size'] = info['img_size'].to("cuda")
+            img = subset.dataset.get_image(id)
+            img_from_file = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            calibs_from_file = subset.dataset.get_calib(id)
+            pc_velo = subset.dataset.get_lidar(id)
+            dets = model.teacher(input_teacher, calib, targets, info, mode='inference')
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+                gt_objects=subset.dataset.get_label(id)
+                gt_objects_filtered=[]
+                for i in range(len(gt_objects)):
+                    # filter objects by writelist
+                    if  gt_objects[i].cls_type not in subset.dataset.writelist:
+                        continue
+                    # filter inappropriate samples
+                    if  gt_objects[i].level_str == 'UnKnown' or  gt_objects[i].pos[-1] < 2:
+                        continue
+                    # ignore the samples beyond the threshold [hard encoding]
+                    threshold = 65
+                    if gt_objects[i].pos[-1] > threshold:
+                        continue
+                    # filter 3d center out of img
+                    proj_inside_img = True
+                    center_3d = gt_objects[i].pos + [0, -gt_objects[i].h / 2, 0]  # real 3D center in 3D space
+                    center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
+                    center_3d, _ = calibs_from_file.rect_to_img(center_3d)  # project 3D center to image plane
+                    center_3d = center_3d[0]  # shape adjustment
+                    if center_3d[0] < 0 or center_3d[0] >= subset.dataset.resolution[0]:
+                        proj_inside_img = False
+                    if center_3d[1] < 0 or center_3d[1] >= subset.dataset.resolution[1]:
+                        proj_inside_img = False
+                    if proj_inside_img == False:
+                        continue
+                    gt_objects_filtered.append(gt_objects[i])
+            objects = []
+            for det in dets:
+                object = Object3d_pred(det)
+                objects.append(object)
+            if len(objects) == 0:
+                sum+=1
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+                if len(gt_objects_filtered) == 0:
+                    gt_sum+=1
+            img_bbox2d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="2D")
+            img_bbox3d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="3D")
+            if(cfg["dataset"]["inference_split"] in ['test','eigen_clean']):
+                img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+                img_bbox2d= show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="2D")
+                img_bbox3d= show_image_with_boxes(img_bbox3d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="3D")
+                img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file, objects_pred=objects)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+        print("number of no predictions images:",sum)
+        if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+            print("number of no gt images:",gt_sum)
+        print("number of total images:",len(subset))
         return
-    # if args.evaluate_only:
-    #     logger.info('###################  Evaluation Only  ##################')
-    #     tester = Tester(cfg=cfg['tester'],
-    #                     model=model,
-    #                     dataloader=test_loader,
-    #                     logger=logger,
-    #                     train_cfg=cfg['trainer'],
-    #                     model_name=model_name)
-    #     tester.test()
-    #     return
-    # ipdb.set_trace()
-    checkpoint = cfg["trainer"].get("pretrain_model", None)
+    # build dataloader
+    train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
     if cfg['dataset']["train_split"] in ["semi", 'semi_eigen_clean']:
         if checkpoint is not None:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],

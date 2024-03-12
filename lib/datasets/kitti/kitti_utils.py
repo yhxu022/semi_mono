@@ -408,3 +408,8 @@ if __name__ == '__main__':
         print ('3D center/2D center/projected 3D center:', center_3d, center_2d, center_3d_projected)
         print('alpha ---> ry ', object.alpha, calib.alpha2ry(object.alpha, center_2d[0]))
         break
+
+def load_velo_scan(velo_filename, dtype=np.float32, n_vec=4):
+    scan = np.fromfile(velo_filename, dtype=dtype)
+    scan = scan.reshape((-1, n_vec))
+    return scan

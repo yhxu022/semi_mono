@@ -17,7 +17,7 @@ from lib.datasets.kitti.kitti_eval_python.eval import get_distance_eval_result
 import lib.datasets.kitti.kitti_eval_python.kitti_common as kitti
 import copy
 from .pd import PhotometricDistort
-
+from .kitti_utils import load_velo_scan
 
 class KITTI_Dataset(data.Dataset):
     def __init__(self, split, cfg):
@@ -67,7 +67,7 @@ class KITTI_Dataset(data.Dataset):
         self.image_dir = os.path.join(self.data_dir, 'image_2')
         self.calib_dir = os.path.join(self.data_dir, 'calib')
         self.label_dir = os.path.join(self.data_dir, 'label_2')
-
+        self.lidar_dir = os.path.join(self.data_dir, "velodyne")
         # data augmentation configuration
         self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
                                                    'sup_partial',"eigen_clean"] else False
@@ -121,7 +121,11 @@ class KITTI_Dataset(data.Dataset):
             calib_file = os.path.join(self.calib_dir, '%06d.txt' % idx)
         assert os.path.exists(calib_file)
         return Calibration(calib_file)
-
+    
+    def get_lidar(self, idx, dtype=np.float32, n_vec=4):
+        lidar_filename = os.path.join(self.lidar_dir, "%06d.bin" % (idx))
+        return load_velo_scan(lidar_filename, dtype, n_vec)
+    
     def eval(self, results_dir, logger):
         logger.info("==> Loading detections and GTs...")
         logger.info(f"==> from {results_dir}")
@@ -199,7 +203,7 @@ class KITTI_Dataset(data.Dataset):
         img = img.transpose(2, 0, 1)  # C * H * W
         if self.split in ["semi_unlabeled","eigen_clean"]:
             # if index==6926:
-            #     weak_img.save("result_weak.jpg")
+            # weak_img.save("result_weak.jpg")
             #     pass
             weak_img = np.array(weak_img).astype(np.float32) / 255.0
             weak_img = (weak_img - self.mean) / self.std

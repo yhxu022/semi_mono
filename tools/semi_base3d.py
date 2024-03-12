@@ -60,13 +60,14 @@ class SemiBase3DDetector(BaseModel):
                  test_loader,
                  semi_train_cfg=None,
                  semi_test_cfg=None,
-                 init_cfg=None) -> None:
+                 init_cfg=None,
+                 inference_set=None) -> None:
         super().__init__(data_preprocessor=None, init_cfg=init_cfg)
         # build model
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
-        self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader)
-        self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader)
+        self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
+        self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
         self.sup_size = semi_train_cfg["sup_size"]

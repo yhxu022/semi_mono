@@ -705,7 +705,7 @@ def draw_top_image(lidar_top):
 def draw_box3d_on_top(
     image,
     boxes3d,
-    color=(255, 255, 255),
+    color=(0, 0, 255),
     thickness=1,
     scores=None,
     text_lables=[],

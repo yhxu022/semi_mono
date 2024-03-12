@@ -6,7 +6,7 @@ import numpy as np
 from uncertainty_estimator import UncertaintyEstimator
 
 class Semi_Mono_DETR(BaseModel):
-    def __init__(self, model, loss, cfg, dataloader):
+    def __init__(self, model, loss, cfg, dataloader, inference_set=None):
         super().__init__()
         self.uncertainty_estimator=UncertaintyEstimator()
         self.model = model
@@ -17,7 +17,9 @@ class Semi_Mono_DETR(BaseModel):
         self.id2cls = {0: 'Pedestrian', 1: 'Car', 2: 'Cyclist'}
         self.dataloader = dataloader
         # self.max_objs = dataloader.dataset.max_objs    # max objects per images, defined in dataset
-        self.max_objs = dataloader["dataset"].max_objs
+        # self.max_objs = dataloader["dataset"].max_objs
+        self.max_objs = 50
+        self.inference_set=inference_set
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode=mode
@@ -79,16 +81,21 @@ class Semi_Mono_DETR(BaseModel):
 
         elif mode == 'inference':
             img_sizes = info['img_size']
-
-            inputs = inputs[0]
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
-            dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
+            if self.pseudo_label_group_num==1:
+                dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+                dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                                                      self.cfg["semi_train_cfg"][
                                                                                          "cls_pseudo_thr"],
                                                                                      self.cfg["semi_train_cfg"][
                                                                                          "score_pseudo_thr"], info)
-
+            else:
+                dets = extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+                dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
+                                                                                     self.cfg["semi_train_cfg"][
+                                                                                         "cls_pseudo_thr"],
+                                                                                     self.cfg["semi_train_cfg"][
+                                                                                         "score_pseudo_thr"], info)          
             return dets
 
         elif mode == 'unsup_loss':
@@ -223,9 +230,9 @@ class Semi_Mono_DETR(BaseModel):
             dets = dets[mask]
             dets = dets.unsqueeze(0)
             dets = dets.detach().cpu().numpy()
-            calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
+            calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
-            cls_mean_size = self.dataloader["dataset"].cls_mean_size
+            cls_mean_size = self.inference_set.cls_mean_size
             dets = decode_detections(
                 dets=dets,
                 info=info,

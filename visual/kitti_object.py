@@ -9,7 +9,7 @@ import os
 import sys
 import numpy as np
 import cv2
-
+from lib.datasets.kitti.kitti_utils import Object3d
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(os.path.join(ROOT_DIR, "mayavi"))
@@ -182,23 +182,28 @@ def viz_kitti_video():
     return
 
 
-def show_image_with_boxes(img, objects, calib, show3d=True, depth=None):
-    """ Show image with 2D bounding boxes """
-    img1 = np.copy(img)  # for 2d bbox
-    img2 = np.copy(img)  # for 3d bbox
-    #img3 = np.copy(img)  # for 3d bbox
-    #TODO: change the color of boxes
+def show_image_with_boxes(img, objects, calib, color,mode="3D"):
+    """ Show image with 2D or 3D bounding boxes """
+    img= np.copy(img)
     for obj in objects:
+        if isinstance(obj,Object3d):
+            obj.type=obj.cls_type 
+            obj.xmin=obj.box2d[0]
+            obj.ymin=obj.box2d[1]
+            obj.xmax=obj.box2d[2]
+            obj.ymax=obj.box2d[3]
+            obj.t=obj.pos
         if obj.type == "DontCare":
             continue
         if obj.type == "Car":
-            cv2.rectangle(
-            img1,
-            (int(obj.xmin), int(obj.ymin)),
-            (int(obj.xmax), int(obj.ymax)),
-            (0, 0, 255),
-            2,
-        )
+            if (mode=="2D"):
+                cv2.rectangle(
+                img,
+                (int(obj.xmin), int(obj.ymin)),
+                (int(obj.xmax), int(obj.ymax)),
+                color,
+                2,
+            )
         # if obj.type == "Pedestrian":
         #     cv2.rectangle(
         #     img1,
@@ -215,35 +220,36 @@ def show_image_with_boxes(img, objects, calib, show3d=True, depth=None):
         #     (0, 255, 255),
         #     2,
         # )
-        box3d_pts_2d, _ = utils.compute_box_3d(obj, calib.P)
-        if box3d_pts_2d is None:
-            print("something wrong in the 3D box.")
-            continue
-        if obj.type == "Car":
-            img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 0, 255))
-        # elif obj.type == "Pedestrian":
-        #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 0))
-        # elif obj.type == "Cyclist":
-        #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 255, 255))
+        if (mode=="3D"):
+            if obj.type == "Car":
+                box3d_pts_2d, _ = utils.compute_box_3d(obj, calib.P2)
+                if box3d_pts_2d is None:
+                    print("something wrong in the 3D box.")
+                    continue
+                img = utils.draw_projected_box3d(img, box3d_pts_2d, color= color)
+            # elif obj.type == "Pedestrian":
+            #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 0))
+            # elif obj.type == "Cyclist":
+            #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 255, 255))
 
 
-        # project
-        # box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
-        # box3d_pts_32d = utils.box3d_to_rgb_box00(box3d_pts_3d_velo)
-        # box3d_pts_32d = calib.project_velo_to_image(box3d_pts_3d_velo)
-        # img3 = utils.draw_projected_box3d(img3, box3d_pts_32d)
-    # print("img1:", img1.shape)
-    #cv2.imshow("2dbox", img1)
-    # print("img3:",img3.shape)
-    # Image.fromarray(img3).show()
-    show3d = True
-    #if show3d:
-        # print("img2:",img2.shape)
-        #cv2.imshow("3dbox", img2)
-    #if depth is not None:
-        #cv2.imshow("depth", depth)
-    
-    return img1, img2
+            # project
+            # box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
+            # box3d_pts_32d = utils.box3d_to_rgb_box00(box3d_pts_3d_velo)
+            # box3d_pts_32d = calib.project_velo_to_image(box3d_pts_3d_velo)
+            # img3 = utils.draw_projected_box3d(img3, box3d_pts_32d)
+        # print("img1:", img1.shape)
+        #cv2.imshow("2dbox", img1)
+        # print("img3:",img3.shape)
+        # Image.fromarray(img3).show()
+        # show3d = True
+        #if show3d:
+            # print("img2:",img2.shape)
+            #cv2.imshow("3dbox", img2)
+        #if depth is not None:
+            #cv2.imshow("depth", depth)
+        
+    return img
 
 
 def show_image_with_boxes_3type(img, objects, calib, objects2d, name, objects_pred):
@@ -705,12 +711,12 @@ def show_lidar_topview_with_boxes(pc_velo, objects, calib, objects_pred=None):
     # print('pc_velo shape: ',pc_velo.shape)
     top_view = utils.lidar_to_top(pc_velo)
     top_image = utils.draw_top_image(top_view)
-    print("top_image:", top_image.shape)
+    # print("top_image:", top_image.shape)
     # gt
 
     def bbox3d(obj):
-        _, box3d_pts_3d = utils.compute_box_3d(obj, calib.P)
-        box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
+        _, box3d_pts_3d = utils.compute_box_3d(obj, calib.P2)
+        box3d_pts_3d_velo = calib.rect_to_lidar(box3d_pts_3d)
         return box3d_pts_3d_velo
 
     boxes3d = [bbox3d(obj) for obj in objects if obj.type != "DontCare"]
@@ -729,7 +735,7 @@ def show_lidar_topview_with_boxes(pc_velo, objects, calib, objects_pred=None):
             top_image, gt, text_lables=lines, scores=None, thickness=1, is_gt=False
         )
 
-    cv2.imshow("top_image", top_image)
+    # cv2.imshow("top_image", top_image)
     return top_image
 
 
