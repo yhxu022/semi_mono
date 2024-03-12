@@ -35,7 +35,7 @@ semi_train_cfg:
   unsup_weight: 0.1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.3 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
   min_pseudo_bbox_wh: (1e-2, 1e-2) # 最小 pseudobbox 宽度
 semi_test_cfg: 
@@ -124,7 +124,7 @@ lr_scheduler:
 trainer:
   max_iteration: 45240
   val_iterval: 232
-  val_begin: 29000
+  val_begin: 20000
   dynamic_intervals: "[(29000,484),(38280,232)]"
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
