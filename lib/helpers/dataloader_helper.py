@@ -24,6 +24,11 @@ def build_dataloader(cfg, workers=16):
             unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg)
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
+        elif cfg['train_split'] == 'semi_raw_mix':
+            labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            unlabeled_dataset = KITTI_Dataset(split='raw_mix', cfg=cfg)
+            train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
+            sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         else:
             print(cfg['train_split'])
             train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)

@@ -47,8 +47,8 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial', 'eigen_clean']
-        if self.split in ['train', 'val', 'trainval', 'test', "eigen_clean"]:
+        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial', 'eigen_clean', 'raw_mix']
+        if self.split in ['train', 'val', 'trainval', 'test', "eigen_clean", 'raw_mix']:
             self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
         elif self.split in ["semi_labeled", "sup_partial"]:
             self.split_file = os.path.join(self.root_dir, 'semi_sets', f'train.{self.fold}@{self.percent}.txt')
@@ -59,9 +59,11 @@ class KITTI_Dataset(data.Dataset):
 
         # path configuration
         if self.split =='test':
-            self.data_dir = os.path.join(self.root_dir, 'testing' )
+            self.data_dir = os.path.join(self.root_dir, 'testing')
         elif self.split == "eigen_clean":
-            self.data_dir = os.path.join(self.root_dir, "eigen_clean" )
+            self.data_dir = os.path.join(self.root_dir, "eigen_clean")
+        elif self.split == "raw_mix":
+            self.data_dir = os.path.join(self.root_dir, "raw_mix")
         else:
             self.data_dir = os.path.join(self.root_dir, 'training')
         self.image_dir = os.path.join(self.data_dir, 'image_2')
@@ -70,7 +72,7 @@ class KITTI_Dataset(data.Dataset):
         self.lidar_dir = os.path.join(self.data_dir, "velodyne")
         # data augmentation configuration
         self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-                                                   'sup_partial',"eigen_clean"] else False
+                                                   'sup_partial', "eigen_clean", "raw_mix"] else False
 
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
@@ -153,7 +155,7 @@ class KITTI_Dataset(data.Dataset):
         # image loading
         img = self.get_image(index)
         # img.save("origin.jpg")
-        if self.split in ["semi_unlabeled","eigen_clean"]:
+        if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
             weak_img = self.get_image(index)
         img_size = np.array(img.size)
         features_size = self.resolution // self.downsample  # W * H
@@ -173,7 +175,7 @@ class KITTI_Dataset(data.Dataset):
             if np.random.random() < self.random_flip:
                 random_flip_flag = True
                 img = img.transpose(Image.FLIP_LEFT_RIGHT)
-                if self.split in ["semi_unlabeled","eigen_clean"]:
+                if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
                     weak_img = weak_img.transpose(Image.FLIP_LEFT_RIGHT)
 
             if self.aug_crop:
@@ -190,7 +192,7 @@ class KITTI_Dataset(data.Dataset):
                             method=Image.AFFINE,
                             data=tuple(trans_inv.reshape(-1).tolist()),
                             resample=Image.BILINEAR)
-        if self.split in ["semi_unlabeled","eigen_clean"]:
+        if self.split in ["semi_unlabeled","eigen_clean", "raw_mix"]:
             weak_img = weak_img.transform(tuple(self.resolution.tolist()),
                                           method=Image.AFFINE,
                                           data=tuple(trans_inv.reshape(-1).tolist()),
@@ -201,7 +203,7 @@ class KITTI_Dataset(data.Dataset):
         img = np.array(img).astype(np.float32) / 255.0
         img = (img - self.mean) / self.std
         img = img.transpose(2, 0, 1)  # C * H * W
-        if self.split in ["semi_unlabeled","eigen_clean"]:
+        if self.split in ["semi_unlabeled","eigen_clean", "raw_mix"]:
             # if index==6926:
             # weak_img.save("result_weak.jpg")
             #     pass
@@ -232,7 +234,7 @@ class KITTI_Dataset(data.Dataset):
         boxes = np.zeros((self.max_objs, 4), dtype=np.float32)
         boxes_3d = np.zeros((self.max_objs, 6), dtype=np.float32)
 
-        if self.split not in ["eigen_clean"]:
+        if self.split not in ["eigen_clean", "raw_mix"]:
             objects = self.get_label(index)
 
 
@@ -360,7 +362,7 @@ class KITTI_Dataset(data.Dataset):
 
         # collect return data
         inputs = img, img
-        if self.split in ["semi_unlabeled", "eigen_clean"]:
+        if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
             #teacher student采用不同的增强
             inputs = img, weak_img
             #teacher student采用相同的增强

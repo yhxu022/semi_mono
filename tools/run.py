@@ -146,7 +146,7 @@ def main():
         return
     # build dataloader
     train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
-    if cfg['dataset']["train_split"] in ["semi", 'semi_eigen_clean']:
+    if cfg['dataset']["train_split"] in ["semi", 'semi_eigen_clean', 'semi_raw_mix']:
         if checkpoint is not None:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
                                        init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
