@@ -12,12 +12,13 @@ from lib.datasets.kitti.kitti_utils import get_objects_from_label
 from lib.datasets.kitti.kitti_utils import Calibration
 from lib.datasets.kitti.kitti_utils import get_affine_transform
 from lib.datasets.kitti.kitti_utils import affine_transform
+from lib.datasets.kitti.kitti_utils import load_velo_scan
 from lib.datasets.kitti.kitti_eval_python.eval import get_official_eval_result
 from lib.datasets.kitti.kitti_eval_python.eval import get_distance_eval_result
 import lib.datasets.kitti.kitti_eval_python.kitti_common as kitti
 import copy
 from .pd import PhotometricDistort
-from .kitti_utils import load_velo_scan
+
 
 class KITTI_Dataset(data.Dataset):
     def __init__(self, split, cfg):

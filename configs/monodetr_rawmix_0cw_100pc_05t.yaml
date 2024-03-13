@@ -35,7 +35,7 @@ semi_train_cfg:
   unsup_weight: 0.1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_pseudo_thr: 0.3 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
   min_pseudo_bbox_wh: (1e-2, 1e-2) # 最小 pseudobbox 宽度
 semi_test_cfg: 
