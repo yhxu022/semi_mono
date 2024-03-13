@@ -256,7 +256,11 @@ class SemiBase3DDetector(BaseModel):
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
         for name, loss in unsup_loss_dict.items():
-            if 'loss_depth' in name:
+            #所有unsup深度loss置零
+            # if 'loss_depth' in name:
+            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            #unsup深度loss置零,保留depth_map loss
+            if 'loss_depth' in name and "loss_depth_map" not in name:
                 unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
 
