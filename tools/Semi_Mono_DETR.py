@@ -4,6 +4,7 @@ from lib.helpers.decode_helper import extract_dets_from_outputs
 from lib.helpers.decode_helper import decode_detections
 import numpy as np
 from uncertainty_estimator import UncertaintyEstimator
+from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader, inference_set=None):
@@ -85,17 +86,13 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num==1:
                 dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "cls_pseudo_thr"],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "score_pseudo_thr"], info)
+                                                            self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
+                                                            self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
             else:
                 dets = extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "cls_pseudo_thr"],
-                                                                                     self.cfg["semi_train_cfg"][
-                                                                                         "score_pseudo_thr"], info)          
+                                                              self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
+                                                            self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)          
             return dets
 
         elif mode == 'unsup_loss':
@@ -228,7 +225,11 @@ class Semi_Mono_DETR(BaseModel):
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
+            if len(dets)>0:
+                scores=dets[1]
             dets = dets.unsqueeze(0)
+            if self.pseudo_label_group_num>1:
+                device=dets.device
             dets = dets.detach().cpu().numpy()
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
@@ -239,5 +240,20 @@ class Semi_Mono_DETR(BaseModel):
                 calibs=calibs,
                 cls_mean_size=cls_mean_size,
                 threshold=self.cfg["tester"].get('threshold', 0.2))
+            calib=calibs[0]
             dets_img = dets[int(info['img_id'])]
+            if self.pseudo_label_group_num>1:
+                if len(dets_img)>=1:
+                    dets_img=torch.tensor(dets_img, dtype=torch.float32).to(device)
+                    loc = dets_img[:,9:12]
+                    h=dets_img[:,6:7]
+                    w=dets_img[:,7:8]
+                    l=dets_img[:,8:9]
+                    ry=dets_img[:,12:13]                
+                    loc_lidar = torch.tensor(calib.rect_to_lidar(loc.detach().cpu().numpy()), dtype=torch.float32).to(device)
+                    loc_lidar[:, 2] += h[:, 0] / 2
+                    heading = -(torch.pi / 2 + ry)
+                    boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
+                    dets_after_nms,_=nms_gpu(boxes_lidar[:6,:], scores[:6,:], thresh=0.55)
+                    pass
         return dets_img
