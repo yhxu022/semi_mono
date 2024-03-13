@@ -226,7 +226,7 @@ class Semi_Mono_DETR(BaseModel):
             mask_list.append(mask)
             dets = dets[mask]
             if len(dets)>0:
-                scores=dets[1]
+                scores=dets[:,1]
             dets = dets.unsqueeze(0)
             if self.pseudo_label_group_num>1:
                 device=dets.device
@@ -254,6 +254,6 @@ class Semi_Mono_DETR(BaseModel):
                     loc_lidar[:, 2] += h[:, 0] / 2
                     heading = -(torch.pi / 2 + ry)
                     boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
-                    dets_after_nms,_=nms_gpu(boxes_lidar[:6,:], scores[:6,:], thresh=0.55)
+                    dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.55)
                     pass
         return dets_img

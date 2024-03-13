@@ -92,7 +92,7 @@ def main():
             calibs_from_file = subset.dataset.get_calib(id)
             pc_velo = subset.dataset.get_lidar(id)
             dets = model.teacher(input_teacher, calib, targets, info, mode='inference')
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
                 gt_objects=subset.dataset.get_label(id)
                 gt_objects_filtered=[]
                 for i in range(len(gt_objects)):
@@ -125,22 +125,23 @@ def main():
                 objects.append(object)
             if len(objects) == 0:
                 sum+=1
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
                 if len(gt_objects_filtered) == 0:
                     gt_sum+=1
             img_bbox2d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="2D")
             img_bbox3d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="3D")
-            if(cfg["dataset"]["inference_split"] in ['test','eigen_clean']):
+            if(cfg["dataset"]["inference_split"] in ['test']):
                 img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
                 img_bbox2d= show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="2D")
                 img_bbox3d= show_image_with_boxes(img_bbox3d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="3D")
                 img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file, objects_pred=objects)
             cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
             cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+            if(cfg["dataset"]["inference_split"] not in ['eigen_clean','raw_mix']):
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
         print("number of no predictions images:",sum)
-        if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean']):
+        if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
             print("number of no gt images:",gt_sum)
         print("number of total images:",len(subset))
         return
