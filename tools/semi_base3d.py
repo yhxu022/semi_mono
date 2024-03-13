@@ -127,8 +127,6 @@ class SemiBase3DDetector(BaseModel):
             #     return self.aug_test(inputs, data_samples, **kwargs)
             # else:
             return self.predict(inputs, calibs, targets, info)
-        elif mode == 'tensor':
-            return self._forward(inputs, data_samples, **kwargs)
         else:
             raise RuntimeError(f'Invalid mode "{mode}". '
                                'Only supports loss, predict and tensor mode')
