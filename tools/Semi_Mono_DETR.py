@@ -6,10 +6,11 @@ import numpy as np
 from uncertainty_estimator import UncertaintyEstimator
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 
+
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader, inference_set=None):
         super().__init__()
-        self.uncertainty_estimator=UncertaintyEstimator()
+        self.uncertainty_estimator = UncertaintyEstimator()
         self.model = model
         self.loss = loss
         self.cfg = cfg
@@ -20,11 +21,11 @@ class Semi_Mono_DETR(BaseModel):
         # self.max_objs = dataloader.dataset.max_objs    # max objects per images, defined in dataset
         # self.max_objs = dataloader["dataset"].max_objs
         self.max_objs = 50
-        self.inference_set=inference_set
+        self.inference_set = inference_set
 
     def forward(self, inputs, calibs, targets, info, mode):
-        self.model.mode=mode
-        self.model.pseudo_label_group_num=self.pseudo_label_group_num
+        self.model.mode = mode
+        self.model.pseudo_label_group_num = self.pseudo_label_group_num
         if mode == 'loss':
             img_sizes = targets['img_size']
             ##dn
@@ -48,7 +49,8 @@ class Semi_Mono_DETR(BaseModel):
             ###dn
             targets = self.prepare_targets(targets, inputs.shape[0])
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
+            dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
+                                                         topk=self.cfg["tester"]['topk'])
             dets = dets.detach().cpu().numpy()
             # get corresponding calibs & transform tensor to numpy
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
@@ -64,35 +66,43 @@ class Semi_Mono_DETR(BaseModel):
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            if self.pseudo_label_group_num==1:
-                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+            if self.pseudo_label_group_num == 1:
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
+                                                             topk=self.cfg["semi_train_cfg"]['topk'])
                 pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
-                                                                                        self.cfg["semi_train_cfg"][
-                                                                                            "cls_pseudo_thr"],
-                                                                                        self.cfg["semi_train_cfg"][
-                                                                                            "score_pseudo_thr"])
+                                                                                         self.cfg["semi_train_cfg"][
+                                                                                             "cls_pseudo_thr"],
+                                                                                         self.cfg["semi_train_cfg"][
+                                                                                             "score_pseudo_thr"])
             else:
-                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
+                                                             K=self.pseudo_label_group_num * self.max_objs,
+                                                             topk=self.pseudo_label_group_num *
+                                                                  self.cfg["semi_train_cfg"]['topk'])
                 pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
-                                                                                        self.cfg["semi_train_cfg"][
-                                                                                            "cls_pseudo_thr"],
-                                                                                        self.cfg["semi_train_cfg"][
-                                                                                            "score_pseudo_thr"])
-            return pseudo_targets_list, mask, cls_score_list ,topk_boxes
+                                                                                         self.cfg["semi_train_cfg"][
+                                                                                             "cls_pseudo_thr"],
+                                                                                         self.cfg["semi_train_cfg"][
+                                                                                             "score_pseudo_thr"])
+            return pseudo_targets_list, mask, cls_score_list, topk_boxes
 
         elif mode == 'inference':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            if self.pseudo_label_group_num==1:
-                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
-                dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
-                                                            self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                            self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
-            else:
-                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+            if self.pseudo_label_group_num == 1:
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
+                                                             topk=self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                               self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                            self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)          
+                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
+            else:
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
+                                                             K=self.pseudo_label_group_num * self.max_objs,
+                                                             topk=self.pseudo_label_group_num *
+                                                                  self.cfg["semi_train_cfg"]['topk'])
+                dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
+                                                              self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
+                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
             return dets
 
         elif mode == 'unsup_loss':
@@ -111,6 +121,27 @@ class Semi_Mono_DETR(BaseModel):
             detr_losses_dict_weighted = {k: detr_losses_dict[k] * weight_dict[k] for k in detr_losses_dict.keys() if
                                          k in weight_dict}
             return detr_losses_dict_weighted
+
+        elif mode == 'statistics':
+            img_sizes = info['img_size']
+            outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
+            if self.pseudo_label_group_num == 1:
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
+                                                             topk=self.cfg["semi_train_cfg"]['topk'])
+                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                                                                       self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
+                                                                       self.cfg["semi_train_cfg"]["score_pseudo_thr"],
+                                                                       info)
+            else:
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
+                                                             K=self.pseudo_label_group_num * self.max_objs,
+                                                             topk=self.pseudo_label_group_num *
+                                                                  self.cfg["semi_train_cfg"]['topk'])
+                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                                                                       self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
+                                                                       self.cfg["semi_train_cfg"]["score_pseudo_thr"],
+                                                                       info)
+            return boxes_lidar, score
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -198,12 +229,13 @@ class Semi_Mono_DETR(BaseModel):
                     heading_ress = torch.cat((heading_ress, heading_res.unsqueeze(0)), dim=0)
             pseudo_target_dict["heading_bin"] = heading_bins
             pseudo_target_dict["heading_res"] = heading_ress
-            if self.pseudo_label_group_num>1:
-                self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
+            if self.pseudo_label_group_num > 1:
+                self.uncertainty_estimator.boxes_cluster(pseudo_target_dict, dets)
             pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
 
-    def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr, info):
+    def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
+                                          info):
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
@@ -225,11 +257,11 @@ class Semi_Mono_DETR(BaseModel):
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
-            if len(dets)>0:
-                scores=dets[:,1]
+            if len(dets) > 0:
+                scores = dets[:, 1]
             dets = dets.unsqueeze(0)
-            if self.pseudo_label_group_num>1:
-                device=dets.device
+            if self.pseudo_label_group_num > 1:
+                device = dets.device
             dets = dets.detach().cpu().numpy()
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
@@ -240,21 +272,85 @@ class Semi_Mono_DETR(BaseModel):
                 calibs=calibs,
                 cls_mean_size=cls_mean_size,
                 threshold=self.cfg["tester"].get('threshold', 0.2))
-            calib=calibs[0]
+            calib = calibs[0]
             dets_img = dets[int(info['img_id'])]
-            if self.pseudo_label_group_num>1:
-                if len(dets_img)>=1:
-                    dets_img=torch.tensor(dets_img, dtype=torch.float32).to(device)
-                    loc = dets_img[:,9:12]
-                    h=dets_img[:,6:7]
-                    w=dets_img[:,7:8]
-                    l=dets_img[:,8:9]
-                    ry=dets_img[:,12:13]                
-                    loc_lidar = torch.tensor(calib.rect_to_lidar(loc.detach().cpu().numpy()), dtype=torch.float32).to(device)
+            if self.pseudo_label_group_num > 1:
+                if len(dets_img) >= 1:
+                    dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
+                    loc = dets_img[:, 9:12]
+                    h = dets_img[:, 6:7]
+                    w = dets_img[:, 7:8]
+                    l = dets_img[:, 8:9]
+                    ry = dets_img[:, 12:13]
+                    loc_lidar = torch.tensor(calib.rect_to_lidar(loc.detach().cpu().numpy()), dtype=torch.float32).to(
+                        device)
                     loc_lidar[:, 2] += h[:, 0] / 2
                     heading = -(torch.pi / 2 + ry)
                     boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
-                    dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.55)
-                    dets_img=dets_img[dets_after_nms].detach().cpu().numpy()
+                    dets_after_nms, _ = nms_gpu(boxes_lidar, scores, thresh=0.55)
+                    dets_img = dets_img[dets_after_nms].detach().cpu().numpy()
                     pass
         return dets_img
+
+    def get_boxes_lidar_and_clsscore(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr,
+                                     score_pseudo_thr, info):
+        cls_score_list = batch_dets[:, :, 1]
+        score_list = []
+        # print(f"cls_scroe_list:      {cls_score_list.shape}")
+        for bz in range(batch_size):
+            dets = batch_dets[bz]
+            calib = batch_calibs[bz]
+            # target=batch_targets[bz]
+            pseudo_labels = dets[:, 0]
+            mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            for i in range(len(pseudo_labels)):
+                if self.id2cls[int(pseudo_labels[i])] in self.writelist:
+                    mask_cls_type[i] = True
+                if dets[i, 1] > cls_pseudo_thr:
+                    mask_cls_pseudo_thr[i] = True
+                    score_list.append(dets[i, 1])
+                score = dets[i, 1] * dets[i, -1]
+                if score > score_pseudo_thr:
+                    mask_score_pseudo_thr[i] = True
+            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
+            # print(mask.shape)
+            dets = dets[mask]
+
+            if len(dets) > 0:
+                scores = dets[:, 1]
+            dets = dets.unsqueeze(0)
+            if self.pseudo_label_group_num > 1:
+                device = dets.device
+            else:
+                device = 'cpu'
+            dets = dets.detach().cpu().numpy()
+            calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
+            info = {key: val.detach().cpu().numpy() for key, val in info.items()}
+            cls_mean_size = self.inference_set.cls_mean_size
+            dets = decode_detections(
+                dets=dets,
+                info=info,
+                calibs=calibs,
+                cls_mean_size=cls_mean_size,
+                threshold=self.cfg["tester"].get('threshold', 0.2))
+            calib = calibs[0]
+            dets_img = dets[int(info['img_id'])]
+            if len(dets_img) >= 1:
+                dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
+                loc = dets_img[:, 9:12]
+                h = dets_img[:, 6:7]
+                w = dets_img[:, 7:8]
+                l = dets_img[:, 8:9]
+                ry = dets_img[:, 12:13]
+                loc_lidar = torch.tensor(calib.rect_to_lidar(loc.detach().cpu().numpy()),
+                                         dtype=torch.float32).to(device)
+                loc_lidar[:, 2] += h[:, 0] / 2
+                heading = -(torch.pi / 2 + ry)
+                boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
+                pass
+            else:
+                boxes_lidar = None
+        score_list = torch.tensor(score_list)
+        return boxes_lidar, score_list
