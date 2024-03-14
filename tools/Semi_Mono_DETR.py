@@ -48,7 +48,7 @@ class Semi_Mono_DETR(BaseModel):
             ###dn
             targets = self.prepare_targets(targets, inputs.shape[0])
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
+            dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
             dets = dets.detach().cpu().numpy()
             # get corresponding calibs & transform tensor to numpy
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
@@ -65,31 +65,31 @@ class Semi_Mono_DETR(BaseModel):
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
             if self.pseudo_label_group_num==1:
-                dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
                 pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "cls_pseudo_thr"],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
             else:
-                dets = extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
                 pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "cls_pseudo_thr"],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
-            return pseudo_targets_list, mask, cls_score_list
+            return pseudo_targets_list, mask, cls_score_list ,topk_boxes
 
         elif mode == 'inference':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
             if self.pseudo_label_group_num==1:
-                dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                             self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                             self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
             else:
-                dets = extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                               self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                             self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)          

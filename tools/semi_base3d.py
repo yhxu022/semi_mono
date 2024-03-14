@@ -179,11 +179,11 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        pseudo_targets_list, mask, cls_score = self.get_pseudo_targets(
+        pseudo_targets_list, mask, cls_score , topk_boxes= self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
         # 用伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info))
+            student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info))
 
         # 用GT监督
         # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
@@ -215,7 +215,7 @@ class SemiBase3DDetector(BaseModel):
         return rename_loss_dict('sup_', reweight_loss_dict(losses, sup_weight))
 
     def loss_by_pseudo_instances(self,
-                                 unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, unsup_info) -> dict:
+                                 unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info) -> dict:
         """Calculate losses from a batch of inputs and pseudo data samples.
 
         Args:

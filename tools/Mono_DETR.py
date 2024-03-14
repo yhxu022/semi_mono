@@ -43,7 +43,7 @@ class Mono_DETR(BaseModel):
             ###dn
             targets = self.prepare_targets(targets, inputs.shape[0])
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
+            dets,topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
             dets = dets.detach().cpu().numpy()
             # get corresponding calibs & transform tensor to numpy
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]

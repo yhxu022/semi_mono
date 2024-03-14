@@ -107,7 +107,7 @@ def extract_dets_from_outputs(outputs, K=50, topk=50):
 
     detections = torch.cat([labels, scores, xs2d, ys2d, size_2d, depth, heading, size_3d, xs3d, ys3d, sigma], dim=2)
 
-    return detections
+    return detections, topk_boxes
 
 
 ############### auxiliary function ############
