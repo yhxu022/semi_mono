@@ -367,7 +367,7 @@ class KITTI_Dataset(data.Dataset):
             #teacher student采用不同的增强
             inputs = img, weak_img
             #teacher student采用相同的增强
-            #inputs = img, img
+            # inputs = img, img
         targets = {
             'calibs': calibs,
             'indices': indices,
