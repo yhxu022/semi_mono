@@ -15,17 +15,32 @@ def build_dataloader(cfg, workers=16):
     # perpare dataset
     if cfg['type'] == 'KITTI':
         if cfg['train_split'] == 'semi':
-            labeled_dataset = KITTI_Dataset(split=cfg['train_split'] + "_labeled", cfg=cfg)
+            if cfg['percent'] != 100:
+                labeled_dataset = KITTI_Dataset(split=cfg['train_split'] + "_labeled", cfg=cfg)
+            else:
+                labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
             unlabeled_dataset = KITTI_Dataset(split=cfg['train_split'] + "_unlabeled", cfg=cfg)
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         elif cfg['train_split'] == 'semi_eigen_clean':
-            labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            if 'fold' in cfg and 'percent' in cfg:
+                if cfg['percent'] != 100:
+                    labeled_dataset = KITTI_Dataset(split='semi' + "_labeled", cfg=cfg)
+                else:
+                    labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            else:
+                labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
             unlabeled_dataset = KITTI_Dataset(split='eigen_clean', cfg=cfg)
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         elif cfg['train_split'] == 'semi_raw_mix':
-            labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            if 'fold' in cfg and 'percent' in cfg:
+                if cfg['percent'] != 100:
+                    labeled_dataset = KITTI_Dataset(split='semi' + "_labeled", cfg=cfg)
+                else:
+                    labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
+            else:
+                labeled_dataset = KITTI_Dataset(split='train', cfg=cfg)
             unlabeled_dataset = KITTI_Dataset(split='raw_mix', cfg=cfg)
             train_set = ConcatDataset([labeled_dataset, unlabeled_dataset])
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
