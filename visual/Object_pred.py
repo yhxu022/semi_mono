@@ -7,7 +7,7 @@ class Object3d_pred(object):
         data = det
         data[1:] = [float(x) for x in data[1:]]
         # extract label, truncation, occlusion
-        self.type = ['Pedestrian', 'Car', 'Cyclist'][data[0]]  # 'Car', 'Pedestrian', ...
+        self.type = ['Pedestrian', 'Car', 'Cyclist'][int(data[0])]  # 'Car', 'Pedestrian', ...
         self.alpha = data[1]  # object observation angle [-pi..pi]
 
         # extract 2d bounding box in 0-based coordinates
