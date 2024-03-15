@@ -166,7 +166,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
-            return boxes_lidar, score
+            return boxes_lidar, score, loc_list
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
