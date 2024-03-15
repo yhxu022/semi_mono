@@ -60,7 +60,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.dataloader["dataset"].cls_mean_size
-            dets = decode_detections(
+            dets , cls_scores= decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -71,6 +71,7 @@ class Semi_Mono_DETR(BaseModel):
                     for i,id in enumerate(info['img_id']):
                         calib=calibs[i]
                         dets_img = dets[int(id)]
+                        cls_score=cls_scores[int(id)]
                         if self.pseudo_label_group_num>1:
                             if len(dets_img)>=1:
                                 dets_img=torch.tensor(dets_img, dtype=torch.float32).to(device)
@@ -84,10 +85,9 @@ class Semi_Mono_DETR(BaseModel):
                                 loc_lidar[:, 2] += h[:, 0] / 2
                                 heading = -(torch.pi / 2 + ry)
                                 boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
-                                dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.7)
+                                dets_after_nms,_=nms_gpu(boxes_lidar, cls_score, thresh=0.7)
                                 dets_img=dets_img[dets_after_nms].detach().cpu().numpy()
                                 dets[int(id)]=dets_img
-                                pass
             return dets, targets
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
@@ -101,10 +101,13 @@ class Semi_Mono_DETR(BaseModel):
                                                                                          self.cfg["semi_train_cfg"][
                                                                                              "score_pseudo_thr"])
             else:
+                # dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
+                #                                              K=self.pseudo_label_group_num * self.max_objs,
+                #                                              topk=self.pseudo_label_group_num *
+                #                                                   self.cfg["semi_train_cfg"]['topk'])
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
-                                                             K=self.pseudo_label_group_num * self.max_objs,
-                                                             topk=self.pseudo_label_group_num *
-                                                                  self.cfg["semi_train_cfg"]['topk'])
+                                                             K=self.pseudo_label_group_num,
+                                                             topk=self.cfg["semi_train_cfg"]['topk'])
                 pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "cls_pseudo_thr"],
@@ -290,7 +293,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.inference_set.cls_mean_size
-            dets = decode_detections(
+            dets , cls_scores= decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -353,7 +356,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.inference_set.cls_mean_size
-            dets = decode_detections(
+            dets , cls_scores= decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,

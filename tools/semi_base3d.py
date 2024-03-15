@@ -246,10 +246,10 @@ class SemiBase3DDetector(BaseModel):
         # 与教师模型每一层的输出计算一致性损失
         #consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
-        #consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
-        consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
-                                                 cls_score, topk_boxes,self.student.loss.indices)
+        #consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
+                                                #  cls_score, topk_boxes,self.student.loss.indices)
 
         losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
             'consistency_weight', 1.)})

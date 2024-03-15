@@ -153,6 +153,7 @@ class MonoDETR(nn.Module):
         """
         self.depthaware_transformer.mode=self.mode
         self.depthaware_transformer.pseudo_label_group_num=self.pseudo_label_group_num
+        self.depthaware_transformer.val_nms=self.val_nms
         features, pos = self.backbone(images)
 
         srcs = []
@@ -192,7 +193,7 @@ class MonoDETR(nn.Module):
         elif self.two_stage_dino:
             query_embeds = None
         else:
-            if self.training or self.mode in ['get_pseudo_targets','inference'] and self.pseudo_label_group_num>1:
+            if self.training or self.mode in ['get_pseudo_targets','inference'] and self.pseudo_label_group_num>1 or self.mode=="predict" and self.val_nms==True:
                 query_embeds = self.query_embed.weight
             else:
                 inference_group=0
