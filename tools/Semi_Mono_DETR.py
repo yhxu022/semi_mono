@@ -25,6 +25,7 @@ class Semi_Mono_DETR(BaseModel):
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode=mode
         self.model.pseudo_label_group_num=self.pseudo_label_group_num
+        self.model.val_nms=self.val_nms
         if mode == 'loss':
             img_sizes = targets['img_size']
             ##dn
@@ -48,7 +49,11 @@ class Semi_Mono_DETR(BaseModel):
             ###dn
             targets = self.prepare_targets(targets, inputs.shape[0])
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
+            if (self.val_nms == False):
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.max_objs, topk=self.cfg["tester"]['topk'])
+            else:
+                dets , topk_boxes= extract_dets_from_outputs(outputs=outputs, K=self.pseudo_label_group_num*self.max_objs, topk=self.pseudo_label_group_num*self.cfg["tester"]['topk'])
+                device=dets.device
             dets = dets.detach().cpu().numpy()
             # get corresponding calibs & transform tensor to numpy
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
@@ -60,6 +65,28 @@ class Semi_Mono_DETR(BaseModel):
                 calibs=calibs,
                 cls_mean_size=cls_mean_size,
                 threshold=self.cfg["tester"].get('threshold', 0.2))
+            if (self.val_nms == True):
+                if len(dets)>0:
+                    for i,id in enumerate(info['img_id']):
+                        calib=calibs[i]
+                        dets_img = dets[int(id)]
+                        if self.pseudo_label_group_num>1:
+                            if len(dets_img)>=1:
+                                dets_img=torch.tensor(dets_img, dtype=torch.float32).to(device)
+                                scores = dets_img[:,-1]
+                                loc = dets_img[:,9:12]
+                                h=dets_img[:,6:7]
+                                w=dets_img[:,7:8]
+                                l=dets_img[:,8:9]
+                                ry=dets_img[:,12:13]                
+                                loc_lidar = torch.tensor(calib.rect_to_lidar(loc.detach().cpu().numpy()), dtype=torch.float32).to(device)
+                                loc_lidar[:, 2] += h[:, 0] / 2
+                                heading = -(torch.pi / 2 + ry)
+                                boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
+                                dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.7)
+                                dets_img=dets_img[dets_after_nms].detach().cpu().numpy()
+                                dets[int(id)]=dets_img
+                                pass
             return dets, targets
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
@@ -79,7 +106,6 @@ class Semi_Mono_DETR(BaseModel):
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"])
             return pseudo_targets_list, mask, cls_score_list ,topk_boxes
-
         elif mode == 'inference':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
@@ -198,8 +224,8 @@ class Semi_Mono_DETR(BaseModel):
                     heading_ress = torch.cat((heading_ress, heading_res.unsqueeze(0)), dim=0)
             pseudo_target_dict["heading_bin"] = heading_bins
             pseudo_target_dict["heading_res"] = heading_ress
-            if self.pseudo_label_group_num>1:
-                self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
+            # if self.pseudo_label_group_num>1:
+            #     self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
             pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
 

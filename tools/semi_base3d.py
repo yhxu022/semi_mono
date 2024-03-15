@@ -71,8 +71,8 @@ class SemiBase3DDetector(BaseModel):
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
         self.sup_size = semi_train_cfg["sup_size"]
-        self.student.pseudo_label_group_num=1
-        self.teacher.pseudo_label_group_num=self.semi_train_cfg.get("pseudo_label_group_num",1)
+        self.student.pseudo_label_group_num=self.teacher.pseudo_label_group_num=self.semi_train_cfg.get("pseudo_label_group_num",1)
+        self.student.val_nms=self.teacher.val_nms=self.semi_test_cfg.get('nms', False)
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
 
