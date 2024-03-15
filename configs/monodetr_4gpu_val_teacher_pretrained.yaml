@@ -19,7 +19,7 @@ dataset:
   writelist: ['Car']
   clip_2d: False
 
-  aug_pd: True
+  aug_pd: False
   aug_crop: True
 
   random_flip: 0.5
@@ -38,7 +38,7 @@ semi_train_cfg:
   topk: 50
   cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
-  pseudo_label_group_num: 11
+  pseudo_label_group_num: 1
 semi_test_cfg: 
   nms: True
   predict_on: 'teacher'
