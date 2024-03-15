@@ -67,7 +67,7 @@ def main():
         print("start inference and visualize")
         print(f"loading from {checkpoint}")
         unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-        subset = Subset(unlabeled_dataset, range(100))
+        subset = Subset(unlabeled_dataset, range(40404))  # 3712 3769 14940 40404
         loader = DataLoader(dataset=subset,
                                 batch_size=1,
                                 num_workers=1,
@@ -75,7 +75,7 @@ def main():
                                 pin_memory=True,
                                 drop_last=False,
                                 persistent_workers=True)
-        model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"], inference_set=subset.dataset).to('cuda')
+        model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"],cfg["semi_test_cfg"], inference_set=subset.dataset).to('cuda')
         if checkpoint is not None:
             ckpt = torch.load(checkpoint)
             model.load_state_dict(ckpt['state_dict'])
