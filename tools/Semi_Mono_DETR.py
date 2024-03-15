@@ -322,7 +322,6 @@ class Semi_Mono_DETR(BaseModel):
                                      score_pseudo_thr, info):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
-        loc_list = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
             dets = batch_dets[bz]
@@ -367,7 +366,6 @@ class Semi_Mono_DETR(BaseModel):
             if len(dets_img) >= 1:
                 dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
                 loc = dets_img[:, 9:12]
-                loc_list.append(loc)
                 h = dets_img[:, 6:7]
                 w = dets_img[:, 7:8]
                 l = dets_img[:, 8:9]
@@ -380,9 +378,7 @@ class Semi_Mono_DETR(BaseModel):
                 pass
             else:
                 boxes_lidar = None
-        if loc_list:
-            loc_list = torch.stack(loc_list).to('cuda')
-        else:
-            loc_list = None
+                loc = None
+
         score_list = torch.tensor(score_list)
-        return boxes_lidar, score_list, loc_list
+        return boxes_lidar, score_list, loc
