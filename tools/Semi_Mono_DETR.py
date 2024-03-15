@@ -167,28 +167,6 @@ class Semi_Mono_DETR(BaseModel):
                                                                        info)
             return boxes_lidar, score
 
-
-        elif mode == 'statistics':
-            img_sizes = info['img_size']
-            outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
-            if self.pseudo_label_group_num == 1:
-                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
-                                                             topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
-                                                                       self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                                       self.cfg["semi_train_cfg"]["score_pseudo_thr"],
-                                                                       info)
-            else:
-                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
-                                                             K=self.pseudo_label_group_num * self.max_objs,
-                                                             topk=self.pseudo_label_group_num *
-                                                                  self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
-                                                                       self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                                       self.cfg["semi_train_cfg"]["score_pseudo_thr"],
-                                                                       info)
-            return boxes_lidar, score
-
     def prepare_targets(self, targets, batch_size):
         targets_list = []
         mask = targets['mask_2d']
