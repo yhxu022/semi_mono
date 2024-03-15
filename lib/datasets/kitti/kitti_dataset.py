@@ -74,7 +74,9 @@ class KITTI_Dataset(data.Dataset):
         # data augmentation configuration
         self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
                                                    'sup_partial', "eigen_clean", "raw_mix"] else False
-
+        #验证集也做增强
+        # self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
+        #                                            'sup_partial', "eigen_clean", "raw_mix","val"] else False
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
         self.aug_calib = cfg.get('aug_calib', False)
@@ -237,8 +239,6 @@ class KITTI_Dataset(data.Dataset):
 
         if self.split not in ["eigen_clean", "raw_mix"]:
             objects = self.get_label(index)
-
-
             # data augmentation for labels
             if random_flip_flag:
                 if self.aug_calib:
