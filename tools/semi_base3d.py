@@ -71,8 +71,9 @@ class SemiBase3DDetector(BaseModel):
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
         self.sup_size = semi_train_cfg["sup_size"]
-        self.student.pseudo_label_group_num=self.teacher.pseudo_label_group_num=self.semi_train_cfg.get("pseudo_label_group_num",1)
-        self.student.val_nms=self.teacher.val_nms=self.semi_test_cfg.get('nms', False)
+        self.student.pseudo_label_group_num = self.teacher.pseudo_label_group_num = self.semi_train_cfg.get(
+            "pseudo_label_group_num", 1)
+        self.student.val_nms = self.teacher.val_nms = self.semi_test_cfg.get('nms', False)
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
 
@@ -179,7 +180,7 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        pseudo_targets_list, mask, cls_score , topk_boxes= self.get_pseudo_targets(
+        pseudo_targets_list, mask, cls_score, topk_boxes = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
         # 用伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
@@ -215,7 +216,8 @@ class SemiBase3DDetector(BaseModel):
         return rename_loss_dict('sup_', reweight_loss_dict(losses, sup_weight))
 
     def loss_by_pseudo_instances(self,
-                                 unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info) -> dict:
+                                 unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes,
+                                 unsup_info) -> dict:
         """Calculate losses from a batch of inputs and pseudo data samples.
 
         Args:
@@ -244,22 +246,22 @@ class SemiBase3DDetector(BaseModel):
         losses = reweight_loss_dict(losses, unsup_weight)
 
         # 与教师模型每一层的输出计算一致性损失
-        #consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
+        consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
-        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        # consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
-        #consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
-                                                #  cls_score, topk_boxes,self.student.loss.indices)
+        # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
+        #  cls_score, topk_boxes,self.student.loss.indices)
 
         losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
             'consistency_weight', 1.)})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
         for name, loss in unsup_loss_dict.items():
-            #所有unsup深度loss置零
+            # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            #unsup深度loss置零,保留depth_map loss
+            # unsup深度loss置零,保留depth_map loss
             if 'loss_depth' in name and "loss_depth_map" not in name:
                 unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
@@ -291,7 +293,7 @@ class SemiBase3DDetector(BaseModel):
                     teacher_decoder_output_level = teacher_decoder_output[level]
                     student_decoder_output_level = student_decoder_output_level[indices[0]]
                     teacher_decoder_output_level = teacher_decoder_output_level[indices[1]]
-                    #cls_score_level=torch.ones_like(cls_score[mask][indices[1]].unsqueeze(1))
+                    # cls_score_level=torch.ones_like(cls_score[mask][indices[1]].unsqueeze(1))
                     cls_score_level = cls_score[mask][indices[1]].unsqueeze(1)
                     delta = student_decoder_output_level - teacher_decoder_output_level.detach()
                     delta = delta.square()
@@ -309,9 +311,9 @@ class SemiBase3DDetector(BaseModel):
     ):
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
-        pseudo_targets_list, mask, cls_score ,topk_boxes= self.teacher.forward(
+        pseudo_targets_list, mask, cls_score, topk_boxes = self.teacher.forward(
             unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
-        return pseudo_targets_list, mask, cls_score,topk_boxes
+        return pseudo_targets_list, mask, cls_score, topk_boxes
 
     def project_pseudo_instances(self, batch_pseudo_instances,
                                  batch_data_samples):

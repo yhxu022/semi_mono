@@ -72,11 +72,11 @@ class KITTI_Dataset(data.Dataset):
         self.label_dir = os.path.join(self.data_dir, 'label_2')
         self.lidar_dir = os.path.join(self.data_dir, "velodyne")
         # data augmentation configuration
-        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-                                                   'sup_partial', "eigen_clean", "raw_mix"] else False
-        #验证集也做增强
         # self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-        #                                            'sup_partial', "eigen_clean", "raw_mix","val"] else False
+        #                                            'sup_partial', "eigen_clean", "raw_mix"] else False
+        #验证集也做增强
+        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
+                                                   'sup_partial', "eigen_clean", "raw_mix", "val"] else False
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
         self.aug_calib = cfg.get('aug_calib', False)
@@ -240,7 +240,7 @@ class KITTI_Dataset(data.Dataset):
         if self.split not in ["eigen_clean", "raw_mix"]:
             objects = self.get_label(index)
             # data augmentation for labels
-            if random_flip_flag:
+            if self.data_augmentation and random_flip_flag:
                 if self.aug_calib:
                     calib.flip(img_size)
                 for object in objects:
@@ -255,7 +255,7 @@ class KITTI_Dataset(data.Dataset):
                     if object.ry > np.pi:  object.ry -= 2 * np.pi
                     if object.ry < -np.pi: object.ry += 2 * np.pi
 
-
+            object_aug = objects.copy()
 
             object_num = len(objects) if len(objects) < self.max_objs else self.max_objs
 
@@ -287,11 +287,19 @@ class KITTI_Dataset(data.Dataset):
 
                 center_3d = objects[i].pos + [0, -objects[i].h / 2, 0]  # real 3D center in 3D space
                 center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
-                center_3d, _ = calib.rect_to_img(center_3d)  # project 3D center to image plane
+                center_3d, pts_rect_depth = calib.rect_to_img(center_3d)  # project 3D center to image plane
                 center_3d = center_3d[0]  # shape adjustment
                 if random_flip_flag and not self.aug_calib:  # random flip for center3d
                     center_3d[0] = img_size[0] - center_3d[0]
                 center_3d = affine_transform(center_3d.reshape(-1), trans)
+
+                object_aug[i].box2d = corner_2d
+                corner_3d_aug = center_3d
+                corner_3d_aug = calib.img_to_rect(corner_3d_aug[0], corner_3d_aug[1], pts_rect_depth)
+                object_aug[i].pos[0] = corner_3d_aug[0]
+                object_aug[i].pos[1] = corner_3d_aug[1] + objects[i].h / 2
+
+
 
                 # filter 3d center out of img
                 proj_inside_img = True
@@ -345,6 +353,10 @@ class KITTI_Dataset(data.Dataset):
                 elif self.depth_scale == 'none':
                     depth[i] = objects[i].pos[-1]
 
+                object_aug[i].pos[-1] = depth[i]
+
+
+
                 # encoding heading angle
                 heading_angle = calib.ry2alpha(objects[i].ry, (objects[i].box2d[0] + objects[i].box2d[2]) / 2)
                 if heading_angle > np.pi:  heading_angle -= 2 * np.pi  # check range
@@ -360,6 +372,16 @@ class KITTI_Dataset(data.Dataset):
                     mask_2d[i] = 1
 
                 calibs[i] = calib.P2
+
+            file_name = '{:010d}.txt'.format(index)
+            file_path = f'/home/xyh/MonoDETR_ori/data/KITTI/training/label_aug/{file_name}.txt'
+            with open(file_path, 'w') as file:
+                lines = []
+                for i in range(len(object_aug)):
+                    object_aug_str = object_aug[i].to_str() + '\n'
+                    lines.append(object_aug_str)
+                file.writelines(lines)
+
 
         # collect return data
         inputs = img, img

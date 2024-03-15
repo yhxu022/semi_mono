@@ -45,6 +45,7 @@ class Semi_Mono_DETR(BaseModel):
             detr_losses_dict_weighted = {k: detr_losses_dict[k] * weight_dict[k] for k in detr_losses_dict.keys() if
                                          k in weight_dict}
             return detr_losses_dict_weighted
+
         elif mode == 'predict':
             img_sizes = info['img_size']
             ###dn
@@ -60,7 +61,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.dataloader["dataset"].cls_mean_size
-            dets , cls_scores= decode_detections(
+            dets, cls_scores= decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -90,6 +91,8 @@ class Semi_Mono_DETR(BaseModel):
                                 dets_img=dets_img[dets_after_nms].detach().cpu().numpy()
                                 dets[int(id)]=dets_img
             return dets, targets
+
+
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
