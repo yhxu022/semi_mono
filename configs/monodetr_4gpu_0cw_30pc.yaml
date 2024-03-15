@@ -124,6 +124,8 @@ lr_scheduler:
 trainer:
   max_iteration: 45240
   val_iterval: 232
+  val_begin: 15000
+  dynamic_intervals: "[(29000,484),(38280,232)]"
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
   #pretrain_model: /data/ipad_3d/monocular/MonoDETR_semi_baseline/work_dir/best_teacher_car_moderate_iter_37584.pth
