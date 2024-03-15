@@ -54,7 +54,7 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
             preds.append([cls_id, alpha] + bbox + dimensions.tolist() + locations.tolist() + [ry, score])
             cls_scores_list.append(cls_score)
         results[info['img_id'][i]] = preds
-        cls_scores[info['img_id'][i]] = cls_score
+        cls_scores[info['img_id'][i]] = cls_scores_list
     return results , cls_scores
 
 
