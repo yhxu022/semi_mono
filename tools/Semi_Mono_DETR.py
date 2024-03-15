@@ -152,14 +152,14 @@ class Semi_Mono_DETR(BaseModel):
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
             if self.pseudo_label_group_num == 1:
-                boxes_lidar, score, loc_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
                 boxes_lidar, score, loc_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
             else:
-                boxes_lidar, score, loc_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
