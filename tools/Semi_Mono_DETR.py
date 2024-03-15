@@ -146,13 +146,14 @@ class Semi_Mono_DETR(BaseModel):
             detr_losses_dict_weighted = {k: detr_losses_dict[k] * weight_dict[k] for k in detr_losses_dict.keys() if
                                          k in weight_dict}
             return detr_losses_dict_weighted
+
         elif mode == 'statistics':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                boxes_lidar, score, loc_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
@@ -161,7 +162,7 @@ class Semi_Mono_DETR(BaseModel):
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                boxes_lidar, score, loc_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
@@ -320,6 +321,7 @@ class Semi_Mono_DETR(BaseModel):
                                      score_pseudo_thr, info):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
+        loc_list = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
             dets = batch_dets[bz]
@@ -353,7 +355,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.inference_set.cls_mean_size
-            dets , cls_scores= decode_detections(
+            dets, cls_scores = decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -364,6 +366,7 @@ class Semi_Mono_DETR(BaseModel):
             if len(dets_img) >= 1:
                 dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
                 loc = dets_img[:, 9:12]
+                loc_list.append(loc)
                 h = dets_img[:, 6:7]
                 w = dets_img[:, 7:8]
                 l = dets_img[:, 8:9]
@@ -376,5 +379,9 @@ class Semi_Mono_DETR(BaseModel):
                 pass
             else:
                 boxes_lidar = None
+        if loc_list:
+            loc_list = torch.stack(loc_list).to('cuda')
+        else:
+            loc_list = None
         score_list = torch.tensor(score_list)
-        return boxes_lidar, score_list
+        return boxes_lidar, score_list, loc_list
