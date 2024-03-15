@@ -385,7 +385,11 @@ class KITTI_Dataset(data.Dataset):
 
         info = {'img_id': index,
                 'img_size': img_size,
-                'bbox_downsample_ratio': img_size / features_size}
+                'bbox_downsample_ratio': img_size / features_size,
+                "random_flip_flag": random_flip_flag,
+                "random_crop_flag": random_crop_flag,
+                "trans": trans, 
+                "trans_inv": trans_inv}
         return inputs, calib.P2, targets, info
 
 
