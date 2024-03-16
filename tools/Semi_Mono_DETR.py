@@ -61,7 +61,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.dataloader["dataset"].cls_mean_size
-            dets, cls_scores= decode_detections(
+            dets, cls_scores = decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,

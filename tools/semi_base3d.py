@@ -246,9 +246,9 @@ class SemiBase3DDetector(BaseModel):
         losses = reweight_loss_dict(losses, unsup_weight)
 
         # 与教师模型每一层的输出计算一致性损失
-        consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
+        # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
-        # consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
         #  cls_score, topk_boxes,self.student.loss.indices)
@@ -257,13 +257,13 @@ class SemiBase3DDetector(BaseModel):
             'consistency_weight', 1.)})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        for name, loss in unsup_loss_dict.items():
+        # for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             # unsup深度loss置零,保留depth_map loss
-            if 'loss_depth' in name and "loss_depth_map" not in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            # if 'loss_depth' in name and "loss_depth_map" not in name:
+            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
 
     def consistency_loss(self,

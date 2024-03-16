@@ -1,15 +1,15 @@
 random_seed: 1
 deterministic: False
+evaluate_only: True
 
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'
-  train_split: 'semi_raw_mix'
-#  fold: 1 #半监督有标签的折数1,2,3,4,5
-#  percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
-  test_split: 'val'
-  batch_size: 4
-  sup_size: 2 
+  inference_split: "train"
+  fold: 1 #半监督有标签的折数1,2,3,4,5
+  percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
+  batch_size: 1
+  sup_size: 0
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -19,9 +19,9 @@ dataset:
   clip_2d: False
 
   aug_pd: True
-  aug_crop: True
+  aug_crop: False
 
-  random_flip: 0.5
+  random_flip: 0.0
   random_crop: 0.5
   scale: 0.05
   shift: 0.05
@@ -29,21 +29,15 @@ dataset:
   depth_scale: 'normal'
 
 semi_train_cfg: 
-  sup_size: 2       
+  sup_size: 0
   freeze_teacher: True # 冻结教师
-  sup_weight: 1 # 监督权重
-  unsup_weight: 0.1 # 无监督权重
-  consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_pseudo_thr: 0.3 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.2 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
-  min_pseudo_bbox_wh: (1e-2, 1e-2) # 最小 pseudobbox 宽度
+  pseudo_label_group_num: 1
+
 semi_test_cfg: 
   predict_on: 'teacher'
-mean_teacher_hook:
-  momentum: 0.001
-  interval: 1
-  skip_buffer: True
 
 model_name: 'monodetr'
 model:
@@ -107,28 +101,12 @@ model:
   set_cost_giou: 2
   set_cost_3dcenter: 10
 
-
-optimizer:
-  type: 'AdamW'
-  lr: 0.0002
-  weight_decay: 0.0001
-
-
-lr_scheduler:
-  type: 'step'  # 'step' or 'cos'
-  warmup: False  # 5 epoches, cosine warmup, init_lir=0.00001 in default
-  decay_rate: 0.1
-  decay_list: [29000, 38280]
-
-
 trainer:
   max_iteration: 45240
   val_iterval: 232
-#  val_begin: 1
-  dynamic_intervals: "[(29000,484),(38280,232)]"
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
-  #pretrain_model: /data/ipad_3d/monocular/MonoDETR_semi_baseline/work_dir/best_teacher_car_moderate_iter_37584.pth
+  pretrain_model: "/home/xyh/MonoDETR_semi_baseline_33/ckpts/best_teacher_car_moderate_iter_41296.pth"
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False
   scalar: 5

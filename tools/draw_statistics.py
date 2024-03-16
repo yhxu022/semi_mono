@@ -58,7 +58,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404
+    subset = Subset(unlabeled_dataset, range(3712))     # 3712 3769 14940 40404  4,5
     loader = DataLoader(dataset=subset,
                         batch_size=1,
                         num_workers=1,
@@ -74,6 +74,7 @@ def main():
 
     all_scores = []
     all_max_ious = []
+    all_l2_distance = []
     for inputs, calib, targets, info in tqdm(loader):
         input_teacher = inputs[1]
         input_teacher = input_teacher.to("cuda")
@@ -81,21 +82,49 @@ def main():
         id = int(info['img_id'])
         # print(id)
         info['img_size'] = info['img_size'].to("cuda")
+        calibs_from_file = subset.dataset.get_calib(id)
         # img = subset.dataset.get_image(id)
         # pc_velo = subset.dataset.get_lidar(id)
         boxes_lidar, score, loc_list = model.teacher(input_teacher, calib, targets, info, mode='statistics')
         if boxes_lidar is None:
             continue
         # print(boxes_lidar.shape, score.shape)
-        gts = unlabeled_dataset.get_label(id)
+        gt_objects = unlabeled_dataset.get_label(id)
+        gts = []
+        for i in range(len(gt_objects)):
+            # filter objects by writelist
+            if gt_objects[i].cls_type not in subset.dataset.writelist:
+                continue
+            # filter inappropriate samples
+            if gt_objects[i].level_str == 'UnKnown' or gt_objects[i].pos[-1] < 2:
+                continue
+            # ignore the samples beyond the threshold [hard encoding]
+            threshold = 65
+            if gt_objects[i].pos[-1] > threshold:
+                continue
+            # filter 3d center out of img
+            proj_inside_img = True
+            center_3d = gt_objects[i].pos + [0, -gt_objects[i].h / 2, 0]  # real 3D center in 3D space
+            center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
+            center_3d, _ = calibs_from_file.rect_to_img(center_3d)  # project 3D center to image plane
+            center_3d = center_3d[0]  # shape adjustment
+            if center_3d[0] < 0 or center_3d[0] >= subset.dataset.resolution[0]:
+                proj_inside_img = False
+            if center_3d[1] < 0 or center_3d[1] >= subset.dataset.resolution[1]:
+                proj_inside_img = False
+            if proj_inside_img == False:
+                continue
+            gts.append(gt_objects[i])
+
         gt_boxes = []
         loc_gts = []
+        l2_distances = []
         calibs_gt = [subset.dataset.get_calib(index) for index in info['img_id']]
         calib_gt = calibs_gt[0]
         for gt in gts:
             if gt.cls_type == "Car":
                 loc = gt.pos.reshape((1, -1))
-                loc_gts.append(loc)
+                loc_gts.append(torch.tensor(loc))
                 h = np.array([gt.h]).reshape((1, -1))
                 w = np.array([gt.w]).reshape((1, -1))
                 l = np.array([gt.l]).reshape((1, -1))
@@ -111,26 +140,39 @@ def main():
             gt_boxes = gt_boxes.squeeze(1).float()
         else:
             continue
-        if loc_gts:
-            loc_gts = torch.stack(loc_gts).to('cuda')
+
+
         boxes_lidar = boxes_lidar.float().to('cuda')
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
-        num_pre = boxes_lidar.shape[0]
-        num_gt = gt_boxes.shape[0]
-        # print(num_pre, num_gt)
-        if num_pre > num_gt:
-            iou3D = iou3D.T
-        max_iou_per_pred = torch.max(iou3D, dim=1)[0]
+        # max_iou_per_pred = torch.max(iou3D, dim=1)[0]
+        max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
 
-        all_scores.extend(score.cpu().numpy())
-        all_max_ious.extend(max_iou_per_pred.cpu().numpy())
-        print(id)
-        print(len(all_scores))
-        print(len(all_max_ious))
+        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]
+        filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
+        filtered_max_ious = [max_iou_values.cpu().numpy()[i] for i in valid_indices]
+        filtered_l2_distances = []
 
+        for idx in valid_indices:
+            pred_loc = loc_list[idx].cpu()  # 预测中心点，确保已移到CPU上
+            gt_loc = loc_gts[max_iou_indices[idx]].cpu()  # 真实中心点，确保已移到CPU上
+            l2_distance = torch.norm(pred_loc - gt_loc, p=2).item()  # 计算L2距离
+            filtered_l2_distances.append(l2_distance)
+
+        # print(iou3D)
+        # print(filtered_max_ious)
+        # print(filtered_scores)
+        # print(filtered_l2_distances)
+        all_scores.extend(filtered_scores)
+        all_max_ious.extend(filtered_max_ious)
+        all_l2_distance.extend(filtered_l2_distances)
+        # print(id)
+        # print(len(all_scores))
+        # print(len(all_max_ious))
+        # print(len(all_l2_distance))
 
     print(len(all_scores))
     print(len(all_max_ious))
+    print(len(all_l2_distance))
     plt.figure(figsize=(10, 6))
     plt.scatter(all_scores, all_max_ious, s=0.5)
     plt.xlim(0, 1)
@@ -143,6 +185,17 @@ def main():
     plt.title('Score vs. Max IoU')
     plt.grid(True)
     plt.savefig(f'score_vs_iou_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(all_scores, all_l2_distance, s=0.5)
+    plt.xlim(0, 1)
+    plt.xticks(np.arange(0, 1.1, 0.2))
+    plt.xlabel('Score')
+
+    plt.ylabel('l2_distance with GT')
+    plt.title('Score vs. l2_distance')
+    plt.grid(True)
+    plt.savefig(f'Score_vs_l2_distance_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
 
 
 if __name__ == '__main__':
