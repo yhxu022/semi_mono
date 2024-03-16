@@ -40,7 +40,7 @@ semi_train_cfg:
   score_pseudo_thr: 0 # pseudobox 阈值
   pseudo_label_group_num: 1
 semi_test_cfg: 
-  nms: True
+  nms: False
   predict_on: 'teacher'
 mean_teacher_hook:
   momentum: 0.001
