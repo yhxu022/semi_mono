@@ -38,6 +38,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
+parser.add_argument('-t', '--to_minute', action='store_true', default=False, help='down to the minute')
 parser.add_argument(
     '--launcher',
     choices=['none', 'pytorch', 'slurm', 'mpi'],
@@ -54,7 +55,10 @@ def main():
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     # output_path = os.path.join('./' + cfg["trainer"]['save_path'], model_name)
-    output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H'))
+    if args.to_minute is False:
+        output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H'))
+    else:
+        output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H_%M'))
     os.makedirs(output_path, exist_ok=True)
     shutil.copy(args.config, output_path)
     shutil.copy(os.path.join('tools', 'semi_base3d.py'), output_path)

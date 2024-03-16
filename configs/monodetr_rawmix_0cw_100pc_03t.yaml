@@ -124,7 +124,7 @@ lr_scheduler:
 trainer:
   max_iteration: 45240
   val_iterval: 232
-#  val_begin: 1
+  val_begin: 20000
   dynamic_intervals: "[(29000,484),(38280,232)]"
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
