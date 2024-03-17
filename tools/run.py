@@ -25,7 +25,7 @@ from mmengine.logging import MMLogger
 from tools.semi_base3d import SemiBase3DDetector
 from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
-from tools.mean_teacher_hook import MeanTeacherHook
+from tools.hook.mean_teacher_hook import MeanTeacherHook
 from loops import TeacherStudentValLoop
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from visual.kitti_util import Calibration
@@ -62,6 +62,7 @@ def main():
     os.makedirs(output_path, exist_ok=True)
     shutil.copy(args.config, output_path)
     shutil.copy(os.path.join('tools', 'semi_base3d.py'), output_path)
+    shutil.copy(os.path.join('tools', 'Semi_Mono_DETR.py'), output_path)
     log_file = os.path.join(output_path, 'train.log')
     logger = MMLogger.get_instance('mmengine', log_file=log_file, log_level='INFO')
     checkpoint = cfg["trainer"].get("pretrain_model", None)
