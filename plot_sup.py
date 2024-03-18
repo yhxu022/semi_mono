@@ -3,6 +3,7 @@ import ast
 import os
 import matplotlib.pyplot as plt
 def plot(jsonfile,savedir):
+    savedir = os.path.dirname(jsonfile)
     batch_unsup_gt_instances_num=[]
     batch_unsup_pseudo_instances_num=[]
     loss=[]
@@ -68,5 +69,6 @@ def plot(jsonfile,savedir):
         plt.legend()
         plt.savefig(os.path.join(savedir,'car_moderate.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_4gpu_origin_100pc/20240305_164111/vis_data/20240305_164111.json",
-         "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_4gpu_origin_100pc/20240305_164111/vis_data")
+    plot("/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_4gpu_origin_30pc@030914/20240309_143200/vis_data/20240309_143200.json",
+
+         None)

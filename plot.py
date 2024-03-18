@@ -3,6 +3,7 @@ import ast
 import os
 import matplotlib.pyplot as plt
 def plot(jsonfile,savedir):
+    savedir = os.path.dirname(jsonfile)
     batch_unsup_gt_instances_num=[]
     batch_unsup_pseudo_instances_num=[]
     loss=[]
@@ -59,5 +60,7 @@ def plot(jsonfile,savedir):
     plt.legend()
     plt.savefig(os.path.join(savedir,'learning rate.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data/20240318_204516.json",
-         "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data")
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data/20240318_204516.json"
+
+
+         ,None)
