@@ -8,7 +8,7 @@ dataset:
   fold: 1 #半监督有标签的折数1,2,3,4,5
   percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
   test_split: 'val'
-  batch_size: 4
+  batch_size: 5
   sup_size: 1 
   use_3d_center: True
   class_merging: False
