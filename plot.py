@@ -10,6 +10,7 @@ def plot(jsonfile,savedir):
     teacher_car_moderate=[]
     student_car_moderate=[]
     step=[]
+    lr=[]
     # 从JSON文件中读取数据
     with open(jsonfile, 'r') as f:
         for line in f:
@@ -24,6 +25,8 @@ def plot(jsonfile,savedir):
             if "loss" in new_data:
                 loss.append(new_data["loss"])
                 train_iter.append(new_data["iter"])
+            if "lr" in new_data:
+                lr.append(new_data["lr"])
             if "teacher/car_moderate" in new_data:
                 teacher_car_moderate.append(new_data["teacher/car_moderate"])
             if "student/car_moderate" in new_data:
@@ -49,6 +52,12 @@ def plot(jsonfile,savedir):
     plt.ylabel('car_moderate')
     plt.legend()
     plt.savefig(os.path.join(savedir,'car_moderate.png'), dpi=1000)
+    plt.figure(4)
+    plt.plot(train_iter, lr, label='learning rate')
+    plt.xlabel('train_iter')
+    plt.ylabel('car_moderate')
+    plt.legend()
+    plt.savefig(os.path.join(savedir,'learning rate.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_4gpu_origin_30pc/20240305_164229/vis_data/20240305_164229.json",
-         "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_4gpu_origin_30pc/20240305_164229/vis_data")
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data/20240318_204516.json",
+         "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data")

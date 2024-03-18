@@ -162,6 +162,25 @@ def main():
             dict(type="MeanTeacherHook", momentum=cfg["mean_teacher_hook"]["momentum"],
                  interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
         ]
+        if cfg.get('two_stages',False)==True:
+            param_scheduler=[# 在 [0, 232*5) 迭代时使用线性学习率
+                            dict(type='LinearLR',
+                            start_factor=0.001,
+                            by_epoch=False,
+                            begin=0,
+                            end=1160),
+                            # 在 [1160, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
+                            dict(type='CosineAnnealingLR',
+                            T_max=cfg["trainer"]["max_iteration"]-1160,
+                            by_epoch=False,
+                            begin=1160,
+                            end=cfg["trainer"]["max_iteration"])
+                    ]
+        else:
+            param_scheduler=dict(type='MultiStepLR',
+                by_epoch=False,
+                milestones=cfg["lr_scheduler"]["decay_list"],
+                gamma=cfg["lr_scheduler"]["decay_rate"]),
         runner = Runner(model=model,
                         work_dir=output_path,
                         custom_hooks=custom_hooks,
@@ -183,10 +202,7 @@ def main():
                                            paramwise_cfg=dict(bias_decay_mult=0,
                                                               norm_decay_mult=0,
                                                               bypass_duplicate=True)),
-                        param_scheduler=dict(type='MultiStepLR',
-                                             by_epoch=False,
-                                             milestones=cfg["lr_scheduler"]["decay_list"],
-                                             gamma=cfg["lr_scheduler"]["decay_rate"]),
+                        param_scheduler = param_scheduler,
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
                                        val_begin=cfg["trainer"].get('val_begin', 1),
