@@ -51,14 +51,15 @@ def main():
     assert (os.path.exists(args.config))
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
-    os.makedirs("outputs_visual", exist_ok=True)
+    save_dir = "statistics"
+    os.makedirs(save_dir, exist_ok=True)
 
     checkpoint = cfg["trainer"].get("pretrain_model", None)
 
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(3712))     # 3712 3769 14940 40404  4,5
+    subset = Subset(unlabeled_dataset, range(20))     # 3712 3769 14940 40404  4,5
     loader = DataLoader(dataset=subset,
                         batch_size=1,
                         num_workers=1,
@@ -184,7 +185,9 @@ def main():
     plt.ylabel('Max IoU with GT')
     plt.title('Score vs. Max IoU')
     plt.grid(True)
-    plt.savefig(f'score_vs_iou_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+    save_path1 = os.path.join(save_dir,
+                              f'score_vs_iou_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+    plt.savefig(save_path1)
 
     plt.figure(figsize=(10, 6))
     plt.scatter(all_scores, all_l2_distance, s=0.5)
@@ -195,7 +198,10 @@ def main():
     plt.ylabel('l2_distance with GT')
     plt.title('Score vs. l2_distance')
     plt.grid(True)
-    plt.savefig(f'Score_vs_l2_distance_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+    save_path2 = os.path.join(save_dir,
+                              f'Score_vs_l2_distance_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+
+    plt.savefig(save_path2)
 
 
 if __name__ == '__main__':
