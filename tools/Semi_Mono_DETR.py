@@ -87,7 +87,7 @@ class Semi_Mono_DETR(BaseModel):
                                 loc_lidar[:, 2] += h[:, 0] / 2
                                 heading = -(torch.pi / 2 + ry)
                                 boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
-                                dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.45)
+                                dets_after_nms,_=nms_gpu(boxes_lidar, scores, thresh=0.55)
                                 dets_img=dets_img[dets_after_nms].detach().cpu().numpy()
                                 dets[int(id)]=dets_img
             return dets, targets

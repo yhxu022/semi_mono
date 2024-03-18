@@ -181,6 +181,7 @@ def main():
                                                           weight_decay=cfg["optimizer"]["weight_decay"]
                                                           ),
                                            paramwise_cfg=dict(bias_decay_mult=0,
+                                                              norm_decay_mult=0,
                                                               bypass_duplicate=True)),
                         param_scheduler=dict(type='MultiStepLR',
                                              by_epoch=False,
@@ -257,6 +258,7 @@ def main():
                                                           weight_decay=cfg["optimizer"]["weight_decay"]
                                                           ),
                                            paramwise_cfg=dict(bias_decay_mult=0,
+                                                              norm_decay_mult=0,
                                                               bypass_duplicate=True)),
                         param_scheduler=dict(type='MultiStepLR',
                                              by_epoch=False,

@@ -60,13 +60,13 @@ def build_dataloader(cfg, workers=16):
     #                          drop_last=False,
     #                          persistent_workers=True)
     test_dataloader = dict(
-        batch_size=4,
+        batch_size=cfg.get("val_batch_size",4),
         sampler=dict(
             type='DefaultSampler',
             shuffle=False),
         dataset=test_set,
         pin_memory=True,
-        num_workers=8,
+        num_workers=cfg.get("val_num_workers",8),
         collate_fn=dict(type='default_collate'),
         persistent_workers=True
     )
