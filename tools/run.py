@@ -177,13 +177,13 @@ def main():
                             end=cfg["trainer"]["max_iteration"])
                     ]
         else:
-            if cfg['lr_scheduler'].get('type', None) is 'step':
+            if cfg['lr_scheduler'].get('type', None) == 'step':
                 print("use MultiStepLR")
                 param_scheduler=dict(type='MultiStepLR',
                     by_epoch=False,
                     milestones=cfg["lr_scheduler"]["decay_list"],
                     gamma=cfg["lr_scheduler"]["decay_rate"]),
-            elif cfg['lr_scheduler'].get('type', None) is 'cos':
+            elif cfg['lr_scheduler'].get('type', None) == 'cos':
                 print("use CosineAnnealingLR")
                 param_scheduler=dict(type='CosineAnnealingLR',
                     T_max=cfg["trainer"]["max_iteration"] - 10000,
