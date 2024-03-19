@@ -76,6 +76,7 @@ def main():
     all_scores = []
     all_max_ious = []
     all_l2_distance = []
+    all_depth_score = []
     for inputs, calib, targets, info in tqdm(loader):
         input_teacher = inputs[1]
         input_teacher = input_teacher.to("cuda")
@@ -86,7 +87,7 @@ def main():
         calibs_from_file = subset.dataset.get_calib(id)
         # img = subset.dataset.get_image(id)
         # pc_velo = subset.dataset.get_lidar(id)
-        boxes_lidar, score, loc_list = model.teacher(input_teacher, calib, targets, info, mode='statistics')
+        boxes_lidar, score, loc_list, depth_score_list = model.teacher(input_teacher, calib, targets, info, mode='statistics')
         if boxes_lidar is None:
             continue
         # print(boxes_lidar.shape, score.shape)
@@ -150,6 +151,7 @@ def main():
 
         valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]
         filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
+        pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
         filtered_max_ious = [max_iou_values.cpu().numpy()[i] for i in valid_indices]
         filtered_l2_distances = []
 
@@ -166,6 +168,7 @@ def main():
         all_scores.extend(filtered_scores)
         all_max_ious.extend(filtered_max_ious)
         all_l2_distance.extend(filtered_l2_distances)
+        all_depth_score.extend(pred_depth_scores)
         # print(id)
         # print(len(all_scores))
         # print(len(all_max_ious))
@@ -174,6 +177,7 @@ def main():
     print(len(all_scores))
     print(len(all_max_ious))
     print(len(all_l2_distance))
+    print(len(all_depth_score))
     plt.figure(figsize=(10, 6))
     plt.scatter(all_scores, all_max_ious, s=0.5)
     plt.xlim(0, 1)
@@ -203,6 +207,19 @@ def main():
 
     plt.savefig(save_path2)
 
+    plt.figure(figsize=(10, 6))
+    plt.scatter(all_depth_score, all_max_ious, s=0.5)
+    plt.xlim(0, 1)
+    plt.xticks(np.arange(0, 1.1, 0.2))
+    plt.xlabel('Depth Score')
+
+    plt.ylabel('IOU')
+    plt.title('Depth Score vs. IOU')
+    plt.grid(True)
+    save_path3 = os.path.join(save_dir,
+                              f'Depth Score vs. IOU_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}.png')
+
+    plt.savefig(save_path3)
 
 if __name__ == '__main__':
     main()

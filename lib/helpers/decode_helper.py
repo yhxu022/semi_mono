@@ -14,10 +14,12 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
     output:
     '''
     results = {}
-    cls_scores={}
+    cls_scores = {}
+    depth_score = {}
     for i in range(dets.shape[0]):  # batch
         preds = []
-        cls_scores_list=[]
+        cls_scores_list = []
+        depth_score_list = []
         for j in range(dets.shape[1]):  # max_dets
             cls_id = int(dets[i, j, 0])
             cls_score = dets[i, j, 1]
@@ -29,7 +31,7 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
             y = dets[i, j, 3] * info['img_size'][i][1]
             w = dets[i, j, 4] * info['img_size'][i][0]
             h = dets[i, j, 5] * info['img_size'][i][1]
-            bbox = [x-w/2, y-h/2, x+w/2, y+h/2]
+            bbox = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]
 
             # 3d bboxs decoding
             # depth decoding
@@ -49,13 +51,14 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
             alpha = get_heading_angle(dets[i, j, 7:31])
             ry = calibs[i].alpha2ry(alpha, x)
 
-
             score = cls_score * dets[i, j, -1]
             preds.append([cls_id, alpha] + bbox + dimensions.tolist() + locations.tolist() + [ry, score])
             cls_scores_list.append(cls_score)
+            depth_score_list.append(dets[i, j, -1])
         results[info['img_id'][i]] = preds
         cls_scores[info['img_id'][i]] = cls_scores_list
-    return results , cls_scores
+        depth_score[info['img_id'][i]] = depth_score_list
+    return results, cls_scores, depth_score
 
 
 def extract_dets_from_outputs(outputs, K=50, topk=50):
@@ -74,30 +77,29 @@ def extract_dets_from_outputs(outputs, K=50, topk=50):
     topk_boxes = (topk_indexes // out_logits.shape[2]).unsqueeze(-1)
     # final labels
     labels = topk_indexes % out_logits.shape[2]
-    
+
     heading = outputs['pred_angle']
     size_3d = outputs['pred_3d_dim']
     depth = outputs['pred_depth'][:, :, 0: 1]
     sigma = outputs['pred_depth'][:, :, 1: 2]
     sigma = torch.exp(-sigma)
 
-
     # decode
     boxes = torch.gather(out_bbox, 1, topk_boxes.repeat(1, 1, 6))  # b, q', 4
 
-    xs3d = boxes[:, :, 0: 1] 
-    ys3d = boxes[:, :, 1: 2] 
+    xs3d = boxes[:, :, 0: 1]
+    ys3d = boxes[:, :, 1: 2]
 
     heading = torch.gather(heading, 1, topk_boxes.repeat(1, 1, 24))
     depth = torch.gather(depth, 1, topk_boxes)
-    sigma = torch.gather(sigma, 1, topk_boxes) 
+    sigma = torch.gather(sigma, 1, topk_boxes)
     size_3d = torch.gather(size_3d, 1, topk_boxes.repeat(1, 1, 3))
 
     corner_2d = box_ops.box_cxcylrtb_to_xyxy(boxes)
 
     xywh_2d = box_ops.box_xyxy_to_cxcywh(corner_2d)
     size_2d = xywh_2d[:, :, 2: 4]
-    
+
     xs2d = xywh_2d[:, :, 0: 1]
     ys2d = xywh_2d[:, :, 1: 2]
 
@@ -153,8 +155,8 @@ def _gather_feat(feat, ind, mask=None):
 
     Returns: tensor shaped in B * K or B * sum(mask)
     '''
-    dim  = feat.size(2)  # get channel dim
-    ind  = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)  # B*len(ind) --> B*len(ind)*1 --> B*len(ind)*C
+    dim = feat.size(2)  # get channel dim
+    ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)  # B*len(ind) --> B*len(ind)*1 --> B*len(ind)*C
     feat = feat.gather(1, ind)  # B*(HW)*C ---> B*K*C
     if mask is not None:
         mask = mask.unsqueeze(2).expand_as(feat)  # B*50 ---> B*K*1 --> B*K*C
@@ -170,9 +172,9 @@ def _transpose_and_gather_feat(feat, ind):
         ind: indices tensor shaped in B * K
     Returns:
     '''
-    feat = feat.permute(0, 2, 3, 1).contiguous()   # B * C * H * W ---> B * H * W * C
-    feat = feat.view(feat.size(0), -1, feat.size(3))   # B * H * W * C ---> B * (H*W) * C
-    feat = _gather_feat(feat, ind)     # B * len(ind) * C
+    feat = feat.permute(0, 2, 3, 1).contiguous()  # B * C * H * W ---> B * H * W * C
+    feat = feat.view(feat.size(0), -1, feat.size(3))  # B * H * W * C ---> B * (H*W) * C
+    feat = _gather_feat(feat, ind)  # B * len(ind) * C
     return feat
 
 

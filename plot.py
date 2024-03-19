@@ -12,6 +12,9 @@ def plot(jsonfile,savedir):
     student_car_moderate=[]
     step=[]
     lr=[]
+    sup_loss_list = []
+    unsup_loss_list = []
+    consisent_loss_list = []
     # 从JSON文件中读取数据
     with open(jsonfile, 'r') as f:
         for line in f:
@@ -26,6 +29,18 @@ def plot(jsonfile,savedir):
             if "loss" in new_data:
                 loss.append(new_data["loss"])
                 train_iter.append(new_data["iter"])
+                sup_loss = 0
+                unsup_loss = 0
+                for key in new_data.keys():
+                    if "sup_loss" in key and "unsup_loss" not in key:
+                        sup_loss = sup_loss + new_data[key]
+                    if "unsup_loss" in key:
+                        unsup_loss = unsup_loss + new_data[key]
+
+                sup_loss_list.append(sup_loss)
+                unsup_loss_list.append(unsup_loss)
+                if "unsup_consistency_loss" in new_data:
+                    consisent_loss_list.append(new_data["unsup_consistency_loss"])
             if "lr" in new_data:
                 lr.append(new_data["lr"])
             if "teacher/car_moderate" in new_data:
@@ -33,6 +48,8 @@ def plot(jsonfile,savedir):
             if "student/car_moderate" in new_data:
                 student_car_moderate.append(new_data["student/car_moderate"])
                 step.append(new_data["step"])
+
+
     plt.figure(1)
     plt.plot(train_iter, batch_unsup_gt_instances_num, label='batch_unsup_gt_instances_num')
     plt.plot(train_iter, batch_unsup_pseudo_instances_num, label="batch_unsup_pseudo_instances_num")
@@ -42,6 +59,9 @@ def plot(jsonfile,savedir):
     plt.savefig(os.path.join(savedir,'batch_unsup_gt_instances_num.png'), dpi=1000)
     plt.figure(2)
     plt.plot(train_iter, loss, label='loss')
+    plt.plot(train_iter, sup_loss_list, label='sup_loss')
+    plt.plot(train_iter, unsup_loss_list, label='unsup_loss')
+    plt.plot(train_iter, consisent_loss_list, label='consistent_loss')
     plt.xlabel('train_iter')
     plt.ylabel('loss')   
     plt.legend()
@@ -60,7 +80,14 @@ def plot(jsonfile,savedir):
     plt.legend()
     plt.savefig(os.path.join(savedir,'learning rate.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@031820/20240318_204516/vis_data/20240318_204516.json"
+    plot(
+
+        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_rawclean@031823/20240318_232423/vis_data/20240318_232423.json"
+
+
+
+
+
 
 
          ,None)

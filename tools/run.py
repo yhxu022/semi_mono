@@ -177,6 +177,7 @@ def main():
                             end=cfg["trainer"]["max_iteration"])
                     ]
         else:
+            if cfg.get('evaluate_only', False):
             param_scheduler=dict(type='MultiStepLR',
                 by_epoch=False,
                 milestones=cfg["lr_scheduler"]["decay_list"],

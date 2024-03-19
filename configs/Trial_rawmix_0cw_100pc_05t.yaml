@@ -1,4 +1,4 @@
-random_seed: 2
+random_seed: 1
 deterministic: False
 
 dataset:
