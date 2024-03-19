@@ -16,10 +16,12 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
     results = {}
     cls_scores = {}
     depth_score = {}
+    scores = {}
     for i in range(dets.shape[0]):  # batch
         preds = []
         cls_scores_list = []
         depth_score_list = []
+        score_list = []
         for j in range(dets.shape[1]):  # max_dets
             cls_id = int(dets[i, j, 0])
             cls_score = dets[i, j, 1]
@@ -55,10 +57,12 @@ def decode_detections(dets, info, calibs, cls_mean_size, threshold):
             preds.append([cls_id, alpha] + bbox + dimensions.tolist() + locations.tolist() + [ry, score])
             cls_scores_list.append(cls_score)
             depth_score_list.append(dets[i, j, -1])
+            score_list.append(score)
         results[info['img_id'][i]] = preds
         cls_scores[info['img_id'][i]] = cls_scores_list
         depth_score[info['img_id'][i]] = depth_score_list
-    return results, cls_scores, depth_score
+        scores[info['img_id'][i]] = score_list
+    return results, cls_scores, depth_score, scores
 
 
 def extract_dets_from_outputs(outputs, K=50, topk=50):

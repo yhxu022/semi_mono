@@ -61,7 +61,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.dataloader["dataset"].get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.dataloader["dataset"].cls_mean_size
-            dets, cls_scores, depth_score_list = decode_detections(
+            dets, cls_scores, depth_score_list, scores = decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -103,7 +103,9 @@ class Semi_Mono_DETR(BaseModel):
                                                                                          self.cfg["semi_train_cfg"][
                                                                                              "cls_pseudo_thr"],
                                                                                          self.cfg["semi_train_cfg"][
-                                                                                             "score_pseudo_thr"])
+                                                                                             "score_pseudo_thr"],
+                                                                                         self.cfg["semi_train_cfg"].get("depth_score_thr",0)
+                                                                                         )
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -113,7 +115,8 @@ class Semi_Mono_DETR(BaseModel):
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "cls_pseudo_thr"],
                                                                                         self.cfg["semi_train_cfg"][
-                                                                                            "score_pseudo_thr"])
+                                                                                            "score_pseudo_thr"],
+                                                                                         self.cfg["semi_train_cfg"].get("depth_score_thr",0))
             return pseudo_targets_list, mask, cls_score_list ,topk_boxes
         elif mode == 'inference':
             img_sizes = info['img_size']
@@ -157,7 +160,7 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                boxes_lidar, score, loc_list, depth_score_list, scores = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
@@ -166,11 +169,11 @@ class Semi_Mono_DETR(BaseModel):
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
+                boxes_lidar, score, loc_list, depth_score_list, scores = self.get_boxes_lidar_and_clsscore(dets, calibs, dets.shape[0],
                                                                        self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                                                                        self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                                                                        info)
-            return boxes_lidar, score, loc_list,depth_score_list
+            return boxes_lidar, score, loc_list,depth_score_list, scores
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -185,7 +188,7 @@ class Semi_Mono_DETR(BaseModel):
             targets_list.append(target_dict)
         return targets_list
 
-    def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr):
+    def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr, depth_score_thr):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
@@ -197,6 +200,7 @@ class Semi_Mono_DETR(BaseModel):
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -205,7 +209,9 @@ class Semi_Mono_DETR(BaseModel):
                 score = dets[i, 1] * dets[i, -1]
                 if score > score_pseudo_thr:
                     mask_score_pseudo_thr[i] = True
-            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr
+                if dets[i, -1] > depth_score_thr:
+                    mask_depth_score_pseudo_thr[i] = True
+            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
             pseudo_target_dict = {}
@@ -295,7 +301,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.inference_set.cls_mean_size
-            dets , cls_scores, depth_score_list= decode_detections(
+            dets , cls_scores, depth_score_list, scores= decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -326,6 +332,7 @@ class Semi_Mono_DETR(BaseModel):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
         depth_score_list = []
+        scores_list = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
             dets = batch_dets[bz]
@@ -359,7 +366,7 @@ class Semi_Mono_DETR(BaseModel):
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
             cls_mean_size = self.inference_set.cls_mean_size
-            dets, cls_scores, depth_score_list1 = decode_detections(
+            dets, cls_scores, depth_score_list1, scores_list1 = decode_detections(
                 dets=dets,
                 info=info,
                 calibs=calibs,
@@ -368,7 +375,9 @@ class Semi_Mono_DETR(BaseModel):
             calib = calibs[0]
             dets_img = dets[int(info['img_id'])]
             depth_score = depth_score_list1[int(info['img_id'])]
+            score_from_list = scores_list1[int(info['img_id'])]
             depth_score_list.append(depth_score)
+            scores_list.append(score_from_list)
             if len(dets_img) >= 1:
                 dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
                 loc = dets_img[:, 9:12]
@@ -389,4 +398,6 @@ class Semi_Mono_DETR(BaseModel):
         score_list = torch.tensor(score_list)
         depth_score_list = torch.tensor(depth_score_list)
         depth_score_list = torch.squeeze(depth_score_list, dim=0)
-        return boxes_lidar, score_list, loc, depth_score_list
+        scores_list = torch.tensor(scores_list)
+        scores_list = torch.squeeze(scores_list, dim=0)
+        return boxes_lidar, score_list, loc, depth_score_list, scores_list
