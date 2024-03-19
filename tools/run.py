@@ -163,17 +163,17 @@ def main():
                  interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
         ]
         if cfg.get('two_stages',False)==True:
-            param_scheduler=[# 在 [0, 232*5) 迭代时使用线性学习率
+            param_scheduler=[# 在 [0, 232*10) 迭代时使用线性学习率
                             dict(type='LinearLR',
                             start_factor=0.001,
                             by_epoch=False,
                             begin=0,
-                            end=1160),
-                            # 在 [1160, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
+                            end=2320),
+                            # 在 [232*10, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
                             dict(type='CosineAnnealingLR',
-                            T_max=cfg["trainer"]["max_iteration"]-1160,
+                            T_max=cfg["trainer"]["max_iteration"]-2320,
                             by_epoch=False,
-                            begin=1160,
+                            begin=2320,
                             end=cfg["trainer"]["max_iteration"])
                     ]
         else:
