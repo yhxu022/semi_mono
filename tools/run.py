@@ -177,11 +177,21 @@ def main():
                             end=cfg["trainer"]["max_iteration"])
                     ]
         else:
-            if cfg.get('evaluate_only', False):
-            param_scheduler=dict(type='MultiStepLR',
-                by_epoch=False,
-                milestones=cfg["lr_scheduler"]["decay_list"],
-                gamma=cfg["lr_scheduler"]["decay_rate"]),
+            if cfg['lr_scheduler'].get('type', None) is 'step':
+                print("use MultiStepLR")
+                param_scheduler=dict(type='MultiStepLR',
+                    by_epoch=False,
+                    milestones=cfg["lr_scheduler"]["decay_list"],
+                    gamma=cfg["lr_scheduler"]["decay_rate"]),
+            elif cfg['lr_scheduler'].get('type', None) is 'cos':
+                print("use CosineAnnealingLR")
+                param_scheduler=dict(type='CosineAnnealingLR',
+                    T_max=cfg["trainer"]["max_iteration"] - 10000,
+                    by_epoch=False,
+                    begin=10000,
+                    end=cfg["trainer"]["max_iteration"]),
+            else:
+                raise RuntimeError("No lr scheduler")
         runner = Runner(model=model,
                         work_dir=output_path,
                         custom_hooks=custom_hooks,

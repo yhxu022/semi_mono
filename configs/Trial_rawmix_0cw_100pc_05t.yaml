@@ -115,7 +115,7 @@ optimizer:
 
 
 lr_scheduler:
-  type: 'step'  # 'step' or 'cos'
+  type: 'cos'  # 'step' or 'cos'
   warmup: False  # 5 epoches, cosine warmup, init_lir=0.00001 in default
   decay_rate: 0.1
   decay_list: [29000, 38280]

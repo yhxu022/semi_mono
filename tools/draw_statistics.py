@@ -59,7 +59,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(20))     # 3712 3769 14940 40404  4,5
+    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  4,5
     loader = DataLoader(dataset=subset,
                         batch_size=1,
                         num_workers=1,
@@ -210,7 +210,7 @@ def main():
     plt.figure(figsize=(10, 6))
     plt.scatter(all_depth_score, all_max_ious, s=0.5)
     plt.xlim(0, 1)
-    plt.xticks(np.arange(0, 1.1, 0.2))
+    # plt.xticks(np.arange(0, 1.1, 0.2))
     plt.xlabel('Depth Score')
 
     plt.ylabel('IOU')

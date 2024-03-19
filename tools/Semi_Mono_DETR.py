@@ -388,4 +388,5 @@ class Semi_Mono_DETR(BaseModel):
 
         score_list = torch.tensor(score_list)
         depth_score_list = torch.tensor(depth_score_list)
+        depth_score_list = torch.squeeze(depth_score_list, dim=0)
         return boxes_lidar, score_list, loc, depth_score_list
