@@ -60,7 +60,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(3712))     # 3712 3769 14940 40404  4,5
+    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  4,5
     loader = DataLoader(dataset=subset,
                         batch_size=1,
                         num_workers=1,
@@ -68,12 +68,25 @@ def main():
                         pin_memory=True,
                         drop_last=False,
                         persistent_workers=True)
-    model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"], inference_set=subset.dataset).to(
-        'cuda')
+    model = SemiBase3DDetector\
+        (cfg, cfg['model'], loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"], inference_set=subset.dataset).to('cuda')
     if checkpoint is not None:
         ckpt = torch.load(checkpoint)
         model.load_state_dict(ckpt['state_dict'])
 
+    all_gts = 0
+    all_preds = 0
+    # GT中的正负面对象：
+    pos_in_gt = 0
+    neg_in_gt = 0
+    # 预测的正负面对象：
+    pos_in_pred = 0
+    neg_in_pred = 0
+
+    all_TP = 0
+    all_TN = 0
+    all_FP = 0
+    all_FN = 0
     all_scores = []
     all_max_ious = []
     all_l2_distance = []
@@ -84,18 +97,16 @@ def main():
         input_teacher = input_teacher.to("cuda")
         calib = calib.to("cuda")
         id = int(info['img_id'])
-        # print(id)
+        # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        # img = subset.dataset.get_image(id)
-        # pc_velo = subset.dataset.get_lidar(id)
         boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list = model.teacher(input_teacher, calib, targets, info, mode='statistics')
-        if boxes_lidar is None:
-            continue
-        # print(boxes_lidar.shape, score.shape)
+        pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
         gts = []
         labels_gt = []
+        labels_pred = pseudo_labels_list
+
         for i in range(len(gt_objects)):
             # filter objects by writelist
             if gt_objects[i].cls_type not in subset.dataset.writelist:
@@ -120,15 +131,15 @@ def main():
             if proj_inside_img == False:
                 continue
             gts.append(gt_objects[i])
-            labels_gt.append(gt_objects[i].cls_type)
+
 
         gt_boxes = []
         loc_gts = []
-        l2_distances = []
         calibs_gt = [subset.dataset.get_calib(index) for index in info['img_id']]
         calib_gt = calibs_gt[0]
         for gt in gts:
             if gt.cls_type == "Car":
+                # pos_in_gt = pos_in_gt + 1
                 loc = gt.pos.reshape((1, -1))
                 loc_gts.append(torch.tensor(loc))
                 h = np.array([gt.h]).reshape((1, -1))
@@ -141,106 +152,66 @@ def main():
                 gt_lidar = np.concatenate([loc_lidar, l, w, h, heading], axis=1)
                 gt_lidar = torch.from_numpy(gt_lidar)
                 gt_boxes.append(gt_lidar)
+                labels_gt.append(1.)
         if gt_boxes:
             gt_boxes = torch.stack(gt_boxes).to('cuda')
             gt_boxes = gt_boxes.squeeze(1).float()
         else:
+            # 该图为负样本图
+            num_gt = 0
+            all_gts = all_gts + num_gt
+            if boxes_lidar is None:
+                num_pre = 0
+            else:
+                num_pre = boxes_lidar.shape[0]
+            all_preds = all_preds + num_pre
             continue
-
+        if boxes_lidar is None:
+            # 预测为0 ， gt不是0
+            num_pre = 0
+            num_gt = gt_boxes.shape[0]
+            all_preds = all_preds + num_pre
+            all_gts = all_gts + num_gt
+            continue
 
         boxes_lidar = boxes_lidar.float().to('cuda')
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
+        num_pre = boxes_lidar.shape[0]
+        num_gt = gt_boxes.shape[0]
+        all_preds = all_preds + num_pre
+        all_gts = all_gts + num_gt
         # max_iou_per_pred = torch.max(iou3D, dim=1)[0]
         max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
-
-        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]
+        # print(f"max_iou_values:{max_iou_values}")
+        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]   # [1,2,0]
         filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
         pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
         pred_depth_and_cls_scores = [score_list.cpu().numpy()[i] for i in valid_indices]
         filtered_max_ious = [max_iou_values.cpu().numpy()[i] for i in valid_indices]
 
-        filtered_l2_distances = []
-        for idx in valid_indices:
-            pred_loc = loc_list[idx].cpu()  # 预测中心点，确保已移到CPU上
-            gt_loc = loc_gts[max_iou_indices[idx]].cpu()  # 真实中心点，确保已移到CPU上
-            l2_distance = torch.norm(pred_loc - gt_loc, p=2).item()  # 计算L2距离
-            filtered_l2_distances.append(l2_distance)
 
-        # print(iou3D)
-        # print(filtered_max_ious)
-        # print(filtered_scores)
-        # print(filtered_l2_distances)
+        # print(f"pseudo_labels_list :{pseudo_labels_list}")
+        # print(f"labels_gt :{labels_gt}")
+        for idx in valid_indices:
+            pred_label = pseudo_labels_list[idx]
+            gt_label = labels_gt[max_iou_indices[idx]]
+            if pred_label == gt_label:
+                all_TP = all_TP + 1
+
+
+
         all_scores.extend(filtered_scores)
         all_max_ious.extend(filtered_max_ious)
-        all_l2_distance.extend(filtered_l2_distances)
         all_depth_score.extend(pred_depth_scores)
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
-        # print(id)
-        # print(len(all_scores))
-        # print(len(all_max_ious))
-        # print(len(all_l2_distance))
 
-    print(len(all_scores))
-    print(len(all_max_ious))
-    print(len(all_l2_distance))
-    print(len(all_depth_score))
-    print(len(all_pred_depth_and_cls_scores))
-    plt.figure(figsize=(10, 6))
-    plt.scatter(all_scores, all_max_ious, s=0.5)
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.xticks(np.arange(0, 1.1, 0.2))
-    plt.yticks(np.arange(0, 1.1, 0.2))
-    plt.xlabel('Score')
-
-    plt.ylabel('Max IoU with GT')
-    plt.title('Score vs. Max IoU')
-    plt.grid(True)
-    save_path1 = os.path.join(save_dir,
-                              f'score_vs_iou_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}_{cfg["semi_train_cfg"]["depth_score_thr"]}.png')
-    plt.savefig(save_path1)
-
-    plt.figure(figsize=(10, 6))
-    plt.scatter(all_scores, all_l2_distance, s=0.5)
-    plt.xlim(0, 1)
-    plt.xticks(np.arange(0, 1.1, 0.2))
-    plt.xlabel('Score')
-
-    plt.ylabel('l2_distance with GT')
-    plt.title('Score vs. l2_distance')
-    plt.grid(True)
-    save_path2 = os.path.join(save_dir,
-                              f'Score_vs_l2_distance_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}_{cfg["semi_train_cfg"]["depth_score_thr"]}.png')
-
-    plt.savefig(save_path2)
-
-    plt.figure(figsize=(10, 6))
-    plt.scatter(all_depth_score, all_max_ious, s=0.5)
-    # plt.xlim(0, 1)
-    # plt.xticks(np.arange(0, 1.1, 0.2))
-    plt.xlabel('Depth Score')
-
-    plt.ylabel('IOU')
-    plt.title('Depth Score vs. IOU')
-    plt.grid(True)
-    save_path3 = os.path.join(save_dir,
-                              f'Depth Score vs. IOU_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}_{cfg["semi_train_cfg"]["depth_score_thr"]}.png')
-
-    plt.savefig(save_path3)
-
-    plt.figure(figsize=(10, 6))
-    plt.scatter(all_pred_depth_and_cls_scores, all_max_ious, s=0.5)
-    # plt.xlim(0, 1)
-    # plt.xticks(np.arange(0, 1.1, 0.2))
-    plt.xlabel('Depth Score')
-
-    plt.ylabel('IOU')
-    plt.title('Depth Score vs. IOU')
-    plt.grid(True)
-    save_path4 = os.path.join(save_dir,
-                              f'Depth and CLS score vs. IOU_{cfg["dataset"]["inference_split"]}_{id}_{cfg["semi_train_cfg"]["cls_pseudo_thr"]}_{cfg["semi_train_cfg"]["depth_score_thr"]}.png')
-
-    plt.savefig(save_path4)
+    print(f"all_gts  --  {all_gts}")
+    print(f"all_preds  --  {all_preds}")
+    print(f"all_TP  --  {all_TP}")
+    all_FP = all_preds - all_TP
+    print(f"all_FP  --  {all_FP}")
+    all_FN = all_gts - all_TP
+    print(f"all_FN  --  {all_FN}")
 
 if __name__ == '__main__':
     main()
