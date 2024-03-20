@@ -273,11 +273,11 @@ class SemiBase3DDetector(BaseModel):
             if 'loss_depth' in name and "loss_depth_map" not in name:
                 unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
-            if 'loss_ce' in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            #将unsup分类损失置零
-            # if 'loss_ce' in name and 'loss_center' not in name:
+            # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            #将unsup分类损失置零
+            if 'loss_ce' in name and 'loss_center' not in name:
+                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
 
     def consistency_loss(self,
