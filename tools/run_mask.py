@@ -23,8 +23,8 @@ from tools.KITTI_METRIC import KITTI_METRIC
 from mmengine.runner import Runner
 from mmengine.logging import MMLogger
 #Mask掉歧义的物体
-# from tools.semi_base3d_mask import SemiBase3DDetector
-from tools.semi_base3d import SemiBase3DDetector
+from tools.semi_base3d_mask import SemiBase3DDetector
+# from tools.semi_base3d import SemiBase3DDetector
 from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
 from tools.hook.mean_teacher_hook import MeanTeacherHook
@@ -249,9 +249,15 @@ def main():
                         log_processor=dict(window_size=50,
                                            by_epoch=False,
                                            custom_cfg=[
-                                               dict(data_src='batch_unsup_pseudo_instances_num',
+                                               dict(data_src='batch_regression_unsup_pseudo_instances_num',
                                                     method_name='mean',
                                                     window_size=50),
+                                                dict(data_src='batch_masked_pseudo_instances_num',
+                                                    method_name='mean',
+                                                    window_size=50),
+                                               dict(data_src='batch_cls_unsup_pseudo_instances_num',
+                                                    method_name='mean',
+                                                    window_size=50),                                                
                                                dict(data_src='batch_unsup_gt_instances_num',
                                                     method_name='mean',
                                                     window_size=50),

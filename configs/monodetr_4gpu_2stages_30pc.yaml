@@ -8,7 +8,7 @@ dataset:
   fold: 1 #半监督有标签的折数1,2,3,4,5
   percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
   test_split: 'val'
-  batch_size: 6
+  batch_size: 4
   sup_size: 2 
   use_3d_center: True
   class_merging: False
@@ -32,12 +32,21 @@ semi_train_cfg:
   sup_size: 2       
   freeze_teacher: True # 冻结教师
   sup_weight: 1 # 监督权重
-  unsup_weight: 2 # 无监督权重
+  unsup_weight: 0.1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
-  score_pseudo_thr: 0 # pseudobox 阈值
-  depth_score_thr: 10 # 深度分
+  cls_cls_pseudo_thr: 0.8 # 用于分类的类pseudobox 阈值
+  cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
+  cls_depth_score_thr: 0 # 用于分类的深度分阈值
+  regression_cls_pseudo_thr: 0.1 # 用于回归的类pseudobox 阈值
+  regression_score_pseudo_thr: 0 # 用于回归的pseudobox 阈值
+  regression_depth_score_thr: 17.5 # 用于回归的深度分阈值
+  mask_cls_pseudo_floor: 0.1
+  mask_cls_pseudo_ceiling: 0.8
+  mask_score_pseudo_floor: 0
+  mask_score_pseudo_ceiling: 10000
+  mask_depth_score_floor: 0
+  mask_depth_score_ceiling: 10000
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:

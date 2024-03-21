@@ -15,7 +15,7 @@ from mmengine import MessageHub
 from mmengine.model import BaseModel
 # from mmdet3d.models import Base3DDetector
 from lib.helpers.model_helper import build_model
-from tools.Semi_Mono_DETR import Semi_Mono_DETR
+from tools.Semi_Mono_DETR_mask import Semi_Mono_DETR
 
 
 def prepare_targets(targets, batch_size):
@@ -187,12 +187,24 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        pseudo_targets_list, mask, cls_score, topk_boxes = self.get_pseudo_targets(
+        #获得用于分类训练的伪标签、用于回归训练的伪标签和要mask的伪标签
+        cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
+            regression_mask, regression_cls_score, regression_topk_boxes,\
+            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes= self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
-        # 用伪标签监督
+        masked_pseudo_instances_num = sum([
+            len(pseudo_targets["labels"])
+            for pseudo_targets in mask_pseudo_targets_list
+        ])
+        message_hub.update_scalar('train/batch_masked_pseudo_instances_num', masked_pseudo_instances_num)
+        #将student的输入mask掉容易造成歧义的对象
+        masked_inputs=student_inputs
+        # 用分类伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info))
-
+            masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
+        # 用回归伪标签监督
+        losses.update(**self.loss_by_pseudo_instances(
+            student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
         # 用GT监督
         # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         # losses.update(**self.loss_by_pseudo_instances(
@@ -217,14 +229,14 @@ class SemiBase3DDetector(BaseModel):
         Returns:
             dict: A dictionary of loss components
         """
-
+        self.student.loss.losses=['labels', 'boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(sup_inputs, sup_calibs, sup_targets, sup_info, mode='loss')
         sup_weight = self.semi_train_cfg.get('sup_weight', 1.)
         return rename_loss_dict('sup_', reweight_loss_dict(losses, sup_weight))
 
     def loss_by_pseudo_instances(self,
                                  unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes,
-                                 unsup_info, unsupweight_from_hook=None) -> dict:
+                                 unsup_info, unsupweight_from_hook=None,mode="cls") -> dict:
         """Calculate losses from a batch of inputs and pseudo data samples.
 
         Args:
@@ -241,13 +253,20 @@ class SemiBase3DDetector(BaseModel):
         Returns:
             dict: A dictionary of loss components
         """
+        if mode=="cls":
+            self.student.loss.losses=['labels']
+        elif mode=="regression":
+            self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
             len(pseudo_targets["labels"])
             for pseudo_targets in pseudo_targets_list
         ])
         message_hub = MessageHub.get_current_instance()
-        message_hub.update_scalar('train/batch_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
+        if mode=="cls":
+            message_hub.update_scalar('train/batch_cls_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
+        elif mode=="regression":
+            message_hub.update_scalar('train/batch_regression_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
         if unsupweight_from_hook is None:
             unsup_weight = self.semi_train_cfg.get(
                 'unsup_weight', 1.) if unsup_pseudo_instances_num > 0 else 0.
@@ -256,28 +275,29 @@ class SemiBase3DDetector(BaseModel):
         # 与教师模型每一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
-        consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
+        if mode=="cls":
+            consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
         #  cls_score, topk_boxes,self.student.loss.indices)
 
-        losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
-            'consistency_weight', 1.)})
+            losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
+                'consistency_weight', 1.)})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
         for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            # unsup深度loss置零,保留depth_map loss
-            # if 'loss_depth' in name and "loss_depth_map" not in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            #unsup深度loss置零,保留depth_map loss
+            if 'loss_depth' in name and "loss_depth_map" not in name:
+                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
             # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失置零
-            if 'loss_ce' in name and 'loss_center' not in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            # if 'loss_ce' in name and 'loss_center' not in name:
+            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
 
     def consistency_loss(self,
@@ -325,9 +345,13 @@ class SemiBase3DDetector(BaseModel):
     ):
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
-        pseudo_targets_list, mask, cls_score, topk_boxes = self.teacher.forward(
+        cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
+            regression_mask, regression_cls_score, regression_topk_boxes,\
+            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes= self.teacher.forward(
             unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
-        return pseudo_targets_list, mask, cls_score, topk_boxes
+        return cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
+            regression_mask, regression_cls_score, regression_topk_boxes,\
+            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes
 
     def project_pseudo_instances(self, batch_pseudo_instances,
                                  batch_data_samples):
