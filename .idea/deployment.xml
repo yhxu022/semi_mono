@@ -10,6 +10,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="THU semimono (project level)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="ipad_3d@222.20.94.235:8703 key">
         <serverdata>
           <mappings>
@@ -39,13 +46,6 @@
         </serverdata>
       </paths>
       <paths name="xyh@166.111.17.86:22 password">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/home/xyh/MonoDETR_semi_baseline" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="xyh@166.111.17.86:22 password (2)">
         <serverdata>
           <mappings>
             <mapping deploy="/home/xyh/MonoDETR_semi_baseline" local="$PROJECT_DIR$" />
