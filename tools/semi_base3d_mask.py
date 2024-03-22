@@ -17,6 +17,12 @@ from mmengine.model import BaseModel
 from lib.helpers.model_helper import build_model
 from tools.Semi_Mono_DETR_mask import Semi_Mono_DETR
 
+def affine_transform_tensor(pt, t):
+    pt = torch.tensor([pt[0], pt[1], 1.], dtype=torch.float64, device=pt.device).unsqueeze(dim=0)
+    t = torch.tensor(t, dtype=torch.float64).squeeze()
+    new_pt = pt.t()
+    new_pt = torch.matmul(t, new_pt)
+    return new_pt[:2].squeeze()
 
 def prepare_targets(targets, batch_size):
     targets_list = []
@@ -198,7 +204,7 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub.update_scalar('train/batch_masked_pseudo_instances_num', masked_pseudo_instances_num)
         #将student的输入mask掉容易造成歧义的对象
-        masked_inputs=student_inputs
+        masked_inputs = self.mask_input_for_student(student_inputs, mask_pseudo_targets_list, info)
         # 用分类伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
             masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
@@ -420,6 +426,39 @@ class SemiBase3DDetector(BaseModel):
         else:
             return self.student(
                 batch_inputs, batch_data_samples, mode='tensor')
+
+    def mask_input_for_student(self, student_inputs, pseudo_targets_to_mask_list, info):
+        student_inputs_masked = student_inputs.clone()
+        for idx, input_img in enumerate(student_inputs_masked):
+            pseudo_targets_to_mask = pseudo_targets_to_mask_list[idx]
+            bbox2ds = pseudo_targets_to_mask["boxes"]
+            for bbox2d in bbox2ds:
+                bbox2d[0] = bbox2d[0] * info['img_size'][0][0]
+                bbox2d[1] = bbox2d[1] * info['img_size'][0][1]
+                bbox2d[2] = bbox2d[2] * info['img_size'][0][0]
+                bbox2d[3] = bbox2d[3] * info['img_size'][0][1]
+                # trans = info['trans'].to(bbox2d.device)
+                x = bbox2d[0]
+                y = bbox2d[1]
+                w = bbox2d[2]
+                h = bbox2d[3]
+                corner_2d = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]
+                corner_2d = torch.stack(corner_2d)
+
+                scale = 1280 / info['img_size'][0][0]
+                transA = torch.tensor([[[scale, 0.0000e+00, 0.0000e+00], [0.0000e+00, scale, 0.0000e+00]]],
+                                      device=corner_2d.device)
+                trans = transA
+
+                corner_2d[:2] = torch.tensor(affine_transform_tensor(corner_2d[:2], trans))
+                corner_2d[2:] = torch.tensor(affine_transform_tensor(corner_2d[2:], trans))
+
+                x1 = corner_2d[0].int()
+                y1 = corner_2d[1].int()
+                x2 = corner_2d[2].int()
+                y2 = corner_2d[3].int()
+                input_img[:, y1:y2, x1:x2] = 0
+        return student_inputs_masked
 
     def extract_feat(self, batch_inputs: Tensor) -> Tuple[Tensor]:
         """Extract features.

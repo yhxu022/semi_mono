@@ -16,7 +16,22 @@ from mmengine.model import BaseModel
 # from mmdet3d.models import Base3DDetector
 from lib.helpers.model_helper import build_model
 from tools.Semi_Mono_DETR import Semi_Mono_DETR
+from lib.datasets.kitti.kitti_utils import affine_transform
 
+def affine_transform_tensor(pt, t):
+    if not isinstance(pt, torch.Tensor):
+        pt = torch.tensor([pt[0], pt[1], 1.], dtype=torch.float64, device=pt.device).unsqueeze(dim=0)
+    else:
+        pt = torch.tensor([pt[0], pt[1], 1.], dtype=torch.float64, device=pt.device).unsqueeze(dim=0)
+
+    if not isinstance(t, torch.Tensor):
+        t = torch.tensor(t, dtype=torch.float64).squeeze()
+    else:
+        t = torch.tensor(t, dtype=torch.float64).squeeze()
+
+    new_pt = pt.t()
+    new_pt = torch.matmul(t, new_pt)
+    return new_pt[:2].squeeze()
 
 def prepare_targets(targets, batch_size):
     targets_list = []
@@ -67,12 +82,12 @@ class SemiBase3DDetector(BaseModel):
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
         #支持加载MonoDETR官方训练权重
-        # student_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')['model_state'])
-        # teacher_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')['model_state'])
-        check_point=torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')["state_dict"]
-        ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-        student_model.load_state_dict(ckpt)
-        teacher_model.load_state_dict(ckpt)
+        student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+        teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+        # check_point=torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')["state_dict"]
+        # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+        # student_model.load_state_dict(ckpt)
+        # teacher_model.load_state_dict(ckpt)
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
         self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
         self.semi_train_cfg = semi_train_cfg
@@ -187,8 +202,12 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        pseudo_targets_list, mask, cls_score, topk_boxes = self.get_pseudo_targets(
+        pseudo_targets_list, mask, cls_score, topk_boxes, pseudo_targets_to_mask_list, mask2dbox_list = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
+
+        student_inputs_with_2dmask = self.mask_input_for_student(student_inputs, pseudo_targets_to_mask_list, mask2dbox_list)
+
+
         # 用伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
             student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info))
@@ -325,9 +344,9 @@ class SemiBase3DDetector(BaseModel):
     ):
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
-        pseudo_targets_list, mask, cls_score, topk_boxes = self.teacher.forward(
+        pseudo_targets_list, mask, cls_score, topk_boxes, pseudo_targets_to_mask_list, mask2dbox_list = self.teacher.forward(
             unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
-        return pseudo_targets_list, mask, cls_score, topk_boxes
+        return pseudo_targets_list, mask, cls_score, topk_boxes, pseudo_targets_to_mask_list, mask2dbox_list
 
     def project_pseudo_instances(self, batch_pseudo_instances,
                                  batch_data_samples):
@@ -411,6 +430,38 @@ class SemiBase3DDetector(BaseModel):
             return self.teacher.extract_feat(batch_inputs)
         else:
             return self.student.extract_feat(batch_inputs)
+
+    def mask_input_for_student(self,student_inputs, pseudo_targets_to_mask_list, mask2dbox_list, info):
+        student_inputs_masked = student_inputs.clone()
+        for idx, input_img in enumerate(student_inputs_masked):
+            pseudo_targets_to_mask = pseudo_targets_to_mask_list[idx]
+            bbox2ds = pseudo_targets_to_mask["boxes"]
+            for bbox2d in bbox2ds:
+                bbox2d[0] = bbox2d[0]*info['img_size'][0][0]
+                bbox2d[1] = bbox2d[1]*info['img_size'][0][1]
+                bbox2d[2] = bbox2d[2]*info['img_size'][0][0]
+                bbox2d[3] = bbox2d[3]*info['img_size'][0][1]
+                # trans = info['trans'].to(bbox2d.device)
+                x = bbox2d[0]
+                y = bbox2d[1]
+                w = bbox2d[2]
+                h = bbox2d[3]
+                corner_2d = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]
+                corner_2d = torch.stack(corner_2d)
+
+                scale = 1280 / info['img_size'][0][0]
+                transA = torch.tensor([[[scale, 0.0000e+00, 0.0000e+00], [0.0000e+00, scale, 0.0000e+00]]], device=corner_2d.device)
+                trans = transA
+
+                corner_2d[:2] = torch.tensor(affine_transform_tensor(corner_2d[:2], trans))
+                corner_2d[2:] = torch.tensor(affine_transform_tensor(corner_2d[2:], trans))
+
+                x1 = corner_2d[0].int()
+                y1 = corner_2d[1].int()
+                x2 = corner_2d[2].int()
+                y2 = corner_2d[3].int()
+                input_img[:, y1:y2, x1:x2] = 0
+        return student_inputs_masked
 
     # 加载从状态字典中加载参数
     def _load_from_state_dict(self, state_dict: dict, prefix: str,

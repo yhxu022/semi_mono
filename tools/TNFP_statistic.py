@@ -70,9 +70,9 @@ def main():
                         persistent_workers=True)
     model = SemiBase3DDetector\
         (cfg, cfg['model'], loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"], inference_set=subset.dataset).to('cuda')
-    if checkpoint is not None:
-        ckpt = torch.load(checkpoint)
-        model.load_state_dict(ckpt['state_dict'])
+    # if checkpoint is not None:
+    #     ckpt = torch.load(checkpoint)
+    #     model.load_state_dict(ckpt['state_dict'])
 
     all_gts = 0
     all_preds = 0
@@ -100,7 +100,8 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list = model.teacher(input_teacher, calib, targets, info, mode='statistics')
+        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list = \
+            model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
         gts = []

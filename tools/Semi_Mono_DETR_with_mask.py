@@ -99,25 +99,30 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
+                pseudo_targets_list, mask, cls_score_list, pseudo_targets_to_mask_list, mask2dbox_list = self.get_pseudo_targets_list_cls_mask(dets, calibs, dets.shape[0],
                                                                                          self.cfg["semi_train_cfg"][
                                                                                              "cls_pseudo_thr"],
                                                                                          self.cfg["semi_train_cfg"][
                                                                                              "score_pseudo_thr"],
-                                                                                         self.cfg["semi_train_cfg"].get("depth_score_thr",0)
+                                                                                         self.cfg["semi_train_cfg"].get("depth_score_thr",0),
+                                                                                         self.cfg["semi_train_cfg"].get("cls_pseudo_mask_thr",0)
                                                                                          )
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                pseudo_targets_list, mask, cls_score_list = self.get_pseudo_targets_list(dets, calibs, dets.shape[0],
+                pseudo_targets_list, mask, cls_score_list, pseudo_targets_to_mask_list, mask2dbox_list = self.get_pseudo_targets_list_cls_mask(dets, calibs, dets.shape[0],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "cls_pseudo_thr"],
                                                                                         self.cfg["semi_train_cfg"][
                                                                                             "score_pseudo_thr"],
-                                                                                         self.cfg["semi_train_cfg"].get("depth_score_thr",0))
-            return pseudo_targets_list, mask, cls_score_list ,topk_boxes
+                                                                                        self.cfg["semi_train_cfg"].get("depth_score_thr",0),
+                                                                                        self.cfg["semi_train_cfg"].get("cls_pseudo_mask_thr",0))
+
+            return pseudo_targets_list, mask, cls_score_list ,topk_boxes, pseudo_targets_to_mask_list, mask2dbox_list
+
+
         elif mode == 'inference':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
@@ -271,9 +276,12 @@ class Semi_Mono_DETR(BaseModel):
             pseudo_targets_list.append(pseudo_target_dict)
         return pseudo_targets_list, mask_list, cls_score_list
 
-    def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr, depth_score_thr):
+    def get_pseudo_targets_list_cls_mask(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr, depth_score_thr,
+                                         cls_pseudo_mask_thr):
         pseudo_targets_list = []
+        pseudo_targets_to_mask_list = []
         mask_list = []
+        mask2dbox_list = []
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
             dets = batch_dets[bz]
@@ -284,6 +292,7 @@ class Semi_Mono_DETR(BaseModel):
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_2dbox = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -294,9 +303,18 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
+                if dets[i, 1] > cls_pseudo_mask_thr and dets[i, 1] < cls_pseudo_thr:
+                    mask_2dbox[i] = True
+
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             mask_list.append(mask)
+            mask2dbox_list.append(mask_2dbox)
+            dets_to_mask = dets[mask_2dbox]
+            print(f"dets_to_mask.shape:{dets_to_mask.shape}")
             dets = dets[mask]
+            pseudo_target_to_mask = {}
+            pseudo_labels_to_mask = dets_to_mask[:, 0].to(torch.int8)
+            pseudo_target_to_mask["labels"] = pseudo_labels_to_mask
             pseudo_target_dict = {}
             pseudo_labels = dets[:, 0].to(torch.int8)
             pseudo_target_dict["labels"] = pseudo_labels
@@ -310,7 +328,21 @@ class Semi_Mono_DETR(BaseModel):
                 pseudo_target_dict["heading_bin"] = torch.zeros(size=(0, 1), dtype=torch.int64, device=device)
                 pseudo_target_dict["heading_res"] = torch.zeros(size=(0, 1), dtype=torch.float32, device=device)
                 pseudo_targets_list.append(pseudo_target_dict)
-                continue
+                if (len(pseudo_labels_to_mask)) == 0:
+                    device = pseudo_labels_to_mask.device
+                    pseudo_target_to_mask["boxes"] = torch.zeros(size=(0, 4), dtype=torch.float32, device=device)
+                    pseudo_targets_to_mask_list.append(pseudo_target_to_mask)
+                    continue
+                else:
+                    for i in range(len(pseudo_labels)):
+                        if (i == 0):
+                            calibs = calib.unsqueeze(0)
+                        else:
+                            calibs = torch.cat((calibs, calib.unsqueeze(0)))
+                    boxes_to_mask = dets_to_mask[:, 2:6].to(torch.float32)
+                    pseudo_target_to_mask["boxes"] = boxes_to_mask
+                    pseudo_targets_to_mask_list.append(pseudo_target_to_mask)
+                    continue
             for i in range(len(pseudo_labels)):
                 if (i == 0):
                     calibs = calib.unsqueeze(0)
@@ -350,8 +382,23 @@ class Semi_Mono_DETR(BaseModel):
             # if self.pseudo_label_group_num>1:
             #     self.uncertainty_estimator.boxes_cluster(pseudo_target_dict,dets)
             pseudo_targets_list.append(pseudo_target_dict)
-        return pseudo_targets_list, mask_list, cls_score_list
-    
+
+            if (len(pseudo_labels_to_mask)) == 0:
+                device = pseudo_labels_to_mask.device
+                pseudo_target_to_mask["boxes"] = torch.zeros(size=(0, 4), dtype=torch.float32, device=device)
+                pseudo_targets_to_mask_list.append(pseudo_target_to_mask)
+                continue
+
+            for i in range(len(pseudo_labels)):
+                if (i == 0):
+                    calibs = calib.unsqueeze(0)
+                else:
+                    calibs = torch.cat((calibs, calib.unsqueeze(0)))
+            boxes_to_mask = dets_to_mask[:, 2:6].to(torch.float32)
+            pseudo_target_to_mask["boxes"] = boxes_to_mask
+            pseudo_targets_to_mask_list.append(pseudo_target_to_mask)
+        return pseudo_targets_list, mask_list, cls_score_list, pseudo_targets_to_mask_list, mask2dbox_list
+
 
     def get_pseudo_targets_list_inference(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
                                           depth_score_thr, info):
