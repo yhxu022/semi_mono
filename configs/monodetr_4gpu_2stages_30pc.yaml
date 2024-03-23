@@ -35,14 +35,14 @@ semi_train_cfg:
   unsup_weight: 0.1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_cls_pseudo_thr: 0.8 # 用于分类的类pseudobox 阈值
+  cls_cls_pseudo_thr: 0.95 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
-  regression_cls_pseudo_thr: 0.1 # 用于回归的类pseudobox 阈值
+  regression_cls_pseudo_thr: 0.05 # 用于回归的类pseudobox 阈值
   regression_score_pseudo_thr: 0 # 用于回归的pseudobox 阈值
   regression_depth_score_thr: 17.5 # 用于回归的深度分阈值
   mask_cls_pseudo_floor: 0.1
-  mask_cls_pseudo_ceiling: 0.8
+  mask_cls_pseudo_ceiling: 0.95
   mask_score_pseudo_floor: 0
   mask_score_pseudo_ceiling: 10000
   mask_depth_score_floor: 0

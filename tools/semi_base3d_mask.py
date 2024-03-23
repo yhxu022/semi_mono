@@ -167,16 +167,6 @@ class SemiBase3DDetector(BaseModel):
         """
         sup_inputs, student_inputs, teacher_inputs = inputs[0][:self.sup_size], inputs[0][self.sup_size:], inputs[1][
                                                                                                            self.sup_size:]
-        # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
-        # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
-        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        # student_image = (student_image * std + mean) * 255.0
-        # teacher_image = (teacher_image * std + mean) * 255.0
-        # student_image=ToPILImage()(np.round(student_image).astype(np.uint8))
-        # teacher_image=ToPILImage()(np.round(teacher_image).astype(np.uint8))
-        # student_image.save("student_image.jpg")
-        # teacher_image.save("teacher_image.jpg")
         sup_calibs, unsup_calibs = calibs[:self.sup_size], calibs[self.sup_size:]
         sup_targets = {k: v[:self.sup_size] for k, v in targets.items()}
         unsup_targets = {k: v[self.sup_size:] for k, v in targets.items()}
@@ -205,6 +195,23 @@ class SemiBase3DDetector(BaseModel):
         message_hub.update_scalar('train/batch_masked_pseudo_instances_num', masked_pseudo_instances_num)
         #将student的输入mask掉容易造成歧义的对象
         masked_inputs = self.mask_input_for_student(student_inputs, mask_pseudo_targets_list, info)
+        #输入可视化
+        # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
+        # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
+        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        # student_image = (student_image * std + mean) * 255.0
+        # teacher_image = (teacher_image * std + mean) * 255.0
+        # student_image=ToPILImage()(np.round(student_image).astype(np.uint8))
+        # teacher_image=ToPILImage()(np.round(teacher_image).astype(np.uint8))
+        # student_image.save("student_image.jpg")
+        # teacher_image.save("teacher_image.jpg")
+        # student_masked_image=masked_inputs[0].cpu().numpy().transpose(1, 2, 0)
+        # mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        # std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        # student_masked_image = (student_masked_image * std + mean) * 255.0
+        # student_masked_image=ToPILImage()(np.round(student_masked_image).astype(np.uint8))
+        # student_masked_image.save("student_masked_image.jpg")
         # 用分类伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
             masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
@@ -291,13 +298,13 @@ class SemiBase3DDetector(BaseModel):
                 'consistency_weight', 1.)})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        for name, loss in unsup_loss_dict.items():
+        # for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #unsup深度loss置零,保留depth_map loss
-            if 'loss_depth' in name and "loss_depth_map" not in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            # if 'loss_depth' in name and "loss_depth_map" not in name:
+            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
             # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
@@ -433,30 +440,20 @@ class SemiBase3DDetector(BaseModel):
             pseudo_targets_to_mask = pseudo_targets_to_mask_list[idx]
             bbox2ds = pseudo_targets_to_mask["boxes"]
             for bbox2d in bbox2ds:
-                bbox2d[0] = bbox2d[0] * info['img_size'][0][0]
-                bbox2d[1] = bbox2d[1] * info['img_size'][0][1]
-                bbox2d[2] = bbox2d[2] * info['img_size'][0][0]
-                bbox2d[3] = bbox2d[3] * info['img_size'][0][1]
-                # trans = info['trans'].to(bbox2d.device)
+                bbox2d[0] = bbox2d[0] * 1280
+                bbox2d[1] = bbox2d[1] * 384
+                bbox2d[2] = bbox2d[2] * 1280
+                bbox2d[3] = bbox2d[3] * 384
                 x = bbox2d[0]
                 y = bbox2d[1]
                 w = bbox2d[2]
                 h = bbox2d[3]
                 corner_2d = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]
                 corner_2d = torch.stack(corner_2d)
-
-                scale = 1280 / info['img_size'][0][0]
-                transA = torch.tensor([[[scale, 0.0000e+00, 0.0000e+00], [0.0000e+00, scale, 0.0000e+00]]],
-                                      device=corner_2d.device)
-                trans = transA
-
-                corner_2d[:2] = torch.tensor(affine_transform_tensor(corner_2d[:2], trans))
-                corner_2d[2:] = torch.tensor(affine_transform_tensor(corner_2d[2:], trans))
-
-                x1 = corner_2d[0].int()
-                y1 = corner_2d[1].int()
-                x2 = corner_2d[2].int()
-                y2 = corner_2d[3].int()
+                x1 = torch.round(corner_2d[0]).int()
+                y1 = torch.round(corner_2d[1]).int()
+                x2 = torch.round(corner_2d[2]).int()
+                y2 = torch.round(corner_2d[3]).int()
                 input_img[:, y1:y2, x1:x2] = 0
         return student_inputs_masked
 
