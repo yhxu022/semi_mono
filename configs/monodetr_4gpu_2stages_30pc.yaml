@@ -32,17 +32,17 @@ semi_train_cfg:
   sup_size: 2       
   freeze_teacher: True # 冻结教师
   sup_weight: 1 # 监督权重
-  unsup_weight: 1 # 无监督权重
+  unsup_weight: 0.2 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   topk: 50
-  cls_cls_pseudo_thr: 0.95 # 用于分类的类pseudobox 阈值
+  cls_cls_pseudo_thr: 0.9 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
   regression_cls_pseudo_thr: 0 # 用于回归的类pseudobox 阈值
   regression_score_pseudo_thr: 0 # 用于回归的pseudobox 阈值
-  regression_depth_score_thr: 20 # 用于回归的深度分阈值
+  regression_depth_score_thr: 17.5 # 用于回归的深度分阈值
   mask_cls_pseudo_floor: 0.1
-  mask_cls_pseudo_ceiling: 0.95
+  mask_cls_pseudo_ceiling: 0.9
   mask_score_pseudo_floor: 0
   mask_score_pseudo_ceiling: 10000
   mask_depth_score_floor: 0
@@ -50,7 +50,7 @@ semi_train_cfg:
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:
-  momentum: 0.001
+  momentum: 0.0001
   interval: 1
   skip_buffer: True
 
@@ -119,7 +119,7 @@ model:
 
 optimizer:
   type: 'AdamW'
-  lr: 0.00001
+  lr: 0.000002
   weight_decay: 0.0001
 
 trainer:

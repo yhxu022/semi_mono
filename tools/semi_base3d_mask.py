@@ -269,7 +269,8 @@ class SemiBase3DDetector(BaseModel):
         if mode=="cls":
             self.student.loss.losses=['labels']
         elif mode=="regression":
-            self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
+            self.student.loss.losses=['boxes',  'dims', 'angles']
+            #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
             len(pseudo_targets["labels"])

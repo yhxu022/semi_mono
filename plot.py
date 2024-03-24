@@ -82,7 +82,7 @@ def plot(jsonfile,savedir):
 if __name__ == "__main__":
     plot(
 
-        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_rawclean@031823/20240318_232423/vis_data/20240318_232423.json"
+        "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032111/20240321_113544/vis_data/20240321_113544.json"
 
 
 
