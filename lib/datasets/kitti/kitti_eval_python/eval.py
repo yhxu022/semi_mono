@@ -821,8 +821,7 @@ def get_official_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict
                 ret_dict['%s_image_easy_R40' % class_to_name[curcls]] = mAPbbox_R40[j, 0, 0]
                 ret_dict['%s_image_moderate_R40' % class_to_name[curcls]] = mAPbbox_R40[j, 1, 0]
                 ret_dict['%s_image_hard_R40' % class_to_name[curcls]] = mAPbbox_R40[j, 2, 0]
-
-    return result, ret_dict, mAP3d_R40[0, 1, 0]
+    return result, ret_dict
 
 
 def get_distance_eval_result(gt_annos, dt_annos, current_classes, PR_detail_dict=None):

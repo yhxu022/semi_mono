@@ -29,7 +29,7 @@ class KITTI_METRIC(BaseMetric):
 
     def compute_metrics(self, results):
         # 返回保存有评测指标结果的字典，其中键为指标名称
-        return dict(car_moderate=self.kitti_evaluate())
+        return self.kitti_evaluate()
     
     def save_results(self, results):
         output_dir = os.path.join(self.output_dir, 'data')

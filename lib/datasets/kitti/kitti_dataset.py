@@ -141,13 +141,13 @@ class KITTI_Dataset(data.Dataset):
         test_id = {'Car': 0, 'Pedestrian': 1, 'Cyclist': 2}
 
         logger.info('==> Evaluating (official) ...')
-        car_moderate = 0
+        car_results_dict={}
         for category in self.writelist:
-            results_str, results_dict, mAP3d_R40 = get_official_eval_result(gt_annos, dt_annos, test_id[category])
+            results_str, results_dict= get_official_eval_result(gt_annos, dt_annos, test_id[category])
             if category == 'Car':
-                car_moderate = mAP3d_R40
+                car_results_dict = results_dict
             logger.info(results_str)
-        return car_moderate
+        return car_results_dict
 
     def __len__(self):
         return self.idx_list.__len__()
