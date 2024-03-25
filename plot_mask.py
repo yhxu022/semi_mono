@@ -218,11 +218,6 @@ def plot(jsonfile):
                 student_Car_image_moderate_R40.append(new_data["student/Car_image_moderate_R40"])
             if "student/Car_image_hard_R40" in new_data:
                 student_Car_image_hard_R40.append(new_data["student/Car_image_hard_R40"])
-            if "teacher/car_moderate" in new_data:
-                teacher_car_moderate.append(new_data["teacher/car_moderate"])
-                step_val.append(new_data["step"])
-            if "student/car_moderate" in new_data:
-                student_car_moderate.append(new_data["student/car_moderate"])
     plt.figure(1)
     plt.plot(train_iter, batch_unsup_gt_instances_num, label='batch_unsup_gt_instances_num')
     plt.plot(train_iter, batch_masked_pseudo_instances_num, label="batch_masked_pseudo_instances_num")
@@ -385,8 +380,8 @@ def plot(jsonfile):
     plt.savefig(os.path.join(savedir,'loss_depth_map.png'), dpi=1000)
 
     plt.figure(16)
-    plt.plot(step_val, teacher_car_moderate, label='teacher_car_moderate')
-    plt.plot(step_val, student_car_moderate, label="student_car_moderate")
+    plt.plot(step, teacher_Car_3d_moderate_R40, label='teacher_Car_3d_moderate_R40')
+    plt.plot(step, student_Car_3d_moderate_R40, label='teacher_Car_3d_moderate_R40')
     plt.xlabel('step')
     plt.ylabel('car_moderate')
     plt.legend()
