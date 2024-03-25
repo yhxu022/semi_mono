@@ -83,6 +83,9 @@ def plot(jsonfile):
     unsup_loss_center_1=[]
     sup_loss_depth_map=[]
     unsup_loss_depth_map=[]
+    teacher_car_moderate=[]
+    student_car_moderate=[]
+    step_val=[]
     # 从JSON文件中读取数据
     with open(jsonfile, 'r') as f:
         for line in f:
@@ -215,6 +218,11 @@ def plot(jsonfile):
                 student_Car_image_moderate_R40.append(new_data["student/Car_image_moderate_R40"])
             if "student/Car_image_hard_R40" in new_data:
                 student_Car_image_hard_R40.append(new_data["student/Car_image_hard_R40"])
+            if "teacher/car_moderate" in new_data:
+                teacher_car_moderate.append(new_data["teacher/car_moderate"])
+                step_val.append(new_data["step"])
+            if "student/car_moderate" in new_data:
+                student_car_moderate.append(new_data["student/car_moderate"])
     plt.figure(1)
     plt.plot(train_iter, batch_unsup_gt_instances_num, label='batch_unsup_gt_instances_num')
     plt.plot(train_iter, batch_masked_pseudo_instances_num, label="batch_masked_pseudo_instances_num")
@@ -375,5 +383,19 @@ def plot(jsonfile):
     plt.ylabel('loss_depth_map')
     plt.legend()
     plt.savefig(os.path.join(savedir,'loss_depth_map.png'), dpi=1000)
+
+    plt.figure(16)
+    plt.plot(step_val, teacher_car_moderate, label='teacher_car_moderate')
+    plt.plot(step_val, student_car_moderate, label="student_car_moderate")
+    plt.xlabel('step')
+    plt.ylabel('car_moderate')
+    plt.legend()
+    plt.savefig(os.path.join(savedir, 'car_moderate.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032515/20240325_150545/vis_data/20240325_150545.json")
+    plot(
+
+        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_rawclean@032513_52/20240325_135305/vis_data/20240325_135305.json"
+
+
+
+    )
