@@ -245,7 +245,25 @@ class SemiBase3DDetector(BaseModel):
         self.student.loss.losses=['labels', 'boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(sup_inputs, sup_calibs, sup_targets, sup_info, mode='loss')
         sup_weight = self.semi_train_cfg.get('sup_weight', 1.)
-        return rename_loss_dict('sup_', reweight_loss_dict(losses, sup_weight))
+        sup_losses = reweight_loss_dict(losses, sup_weight)
+        sup_loss_dict = rename_loss_dict('sup_',
+                                           sup_losses)
+        # 权重改变：
+        unsup_weight = 2
+        for name, loss in sup_loss_dict.items():
+            # 所有sup深度loss置零
+            # if 'loss_depth' in name:
+            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
+            # sup深度loss置零,保留depth_map loss
+            if 'loss_depth' in name and "loss_depth_map" not in name:
+                sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
+            # 将sup分类损失和中心点损失置零
+            # if 'loss_ce' in name:
+            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
+            # 将sup分类损失置零
+            # if 'loss_ce' in name and 'loss_center' not in name:
+            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
+        return sup_loss_dict
 
     def loss_by_pseudo_instances(self,
                                  unsup_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes,
@@ -299,13 +317,13 @@ class SemiBase3DDetector(BaseModel):
                 'consistency_weight', 1.)})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        # for name, loss in unsup_loss_dict.items():
+        for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #unsup深度loss置零,保留depth_map loss
-            # if 'loss_depth' in name and "loss_depth_map" not in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            if 'loss_depth' in name and "loss_depth_map" not in name:
+                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
             # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
