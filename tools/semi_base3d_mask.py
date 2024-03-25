@@ -252,21 +252,6 @@ class SemiBase3DDetector(BaseModel):
         sup_losses = reweight_loss_dict(losses, sup_weight)
         sup_loss_dict = rename_loss_dict('sup_',
                                            sup_losses)
-        # 权重改变：
-        unsup_weight = 2
-        for name, loss in sup_loss_dict.items():
-            # 所有sup深度loss置零
-            # if 'loss_depth' in name:
-            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
-            # sup深度loss置零,保留depth_map loss
-            if 'loss_depth' in name and "loss_depth_map" not in name:
-                sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
-            # 将sup分类损失和中心点损失置零
-            # if 'loss_ce' in name:
-            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
-            # 将sup分类损失置零
-            # if 'loss_ce' in name and 'loss_center' not in name:
-            #     sup_loss_dict[name] = sup_loss_dict[name] * (1+unsup_weight)
         return sup_loss_dict
 
     def loss_by_pseudo_instances(self,
@@ -291,7 +276,8 @@ class SemiBase3DDetector(BaseModel):
         if mode=="cls":
             self.student.loss.losses=['labels']
         elif mode=="regression":
-            self.student.loss.losses=['boxes',  'dims', 'angles']
+            #self.student.loss.losses=['boxes',  'dims', 'angles']
+            self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
