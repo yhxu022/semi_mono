@@ -376,4 +376,4 @@ def plot(jsonfile):
     plt.legend()
     plt.savefig(os.path.join(savedir,'loss_depth_map.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032421/20240324_210124/vis_data/20240324_210124.json")
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032514/20240325_143457/vis_data/20240325_143457.json")
