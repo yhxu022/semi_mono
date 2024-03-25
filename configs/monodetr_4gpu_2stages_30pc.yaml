@@ -40,7 +40,7 @@ semi_train_cfg:
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
   regression_cls_pseudo_thr: 0 # 用于回归的类pseudobox 阈值
   regression_score_pseudo_thr: 0 # 用于回归的pseudobox 阈值
-  regression_depth_score_thr: 17.5 # 用于回归的深度分阈值
+  regression_depth_score_thr: 15 # 用于回归的深度分阈值
   mask_cls_pseudo_floor: 0.1
   mask_cls_pseudo_ceiling: 0.9
   mask_score_pseudo_floor: 0
@@ -50,7 +50,7 @@ semi_train_cfg:
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:
-  momentum: 0.001
+  momentum: 0.0005
   interval: 1
   skip_buffer: True
 

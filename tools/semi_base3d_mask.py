@@ -222,10 +222,12 @@ class SemiBase3DDetector(BaseModel):
         # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         # losses.update(**self.loss_by_pseudo_instances(
         #     student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
-        if "unsup_loss_depth"not in losses:
+        if "unsup_loss_depth" not in losses:
             losses["sup_loss_depth"]*=1+self.unsup_weight
             losses["sup_loss_depth_0"]*=1+self.unsup_weight   
-            losses["sup_loss_depth_1"]*=1+self.unsup_weight   
+            losses["sup_loss_depth_1"]*=1+self.unsup_weight  
+        if "unsup_loss_depth_map" not in losses:
+            losses["sup_loss_depth_map"]*=1+self.unsup_weight
         return losses
 
     def loss_by_gt_instances(self,
@@ -277,7 +279,8 @@ class SemiBase3DDetector(BaseModel):
             self.student.loss.losses=['labels']
         elif mode=="regression":
             #self.student.loss.losses=['boxes',  'dims', 'angles']
-            self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
+            self.student.loss.losses=['boxes','dims', 'angles', 'center']
+            # self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
