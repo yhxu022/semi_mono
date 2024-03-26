@@ -326,7 +326,11 @@ class SemiBase3DDetector(BaseModel):
             # if 'loss_ce' in name and 'loss_center' not in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
-
+    def depth_map_consistency_loss(self,
+                         student_depth_map_logits,
+                         teacher_depth_map_logits):
+        depth_map_consistency_loss=1
+        return depth_map_consistency_loss
     def consistency_loss(self,
                          student_decoder_outputs,
                          teacher_decoder_outputs,
