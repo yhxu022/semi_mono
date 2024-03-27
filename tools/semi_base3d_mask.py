@@ -282,8 +282,8 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
         if mode=="cls":
-            # self.student.loss.losses=['labels']
-            self.student.loss.losses=[]
+            self.student.loss.losses=['labels']
+            # self.student.loss.losses=[]
         elif mode=="regression":
             #self.student.loss.losses=['boxes',  'dims', 'angles']
             self.student.loss.losses=['boxes','dims', 'angles', 'center']
@@ -310,9 +310,9 @@ class SemiBase3DDetector(BaseModel):
         # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
         if mode=="cls":
-            cls_consistency_loss=self.cls_consistency_loss(\
-                self.student.model.pred_logits,self.teacher.model.pred_logits,self.student.loss.indices)
-            losses.update({"loss_ce": cls_consistency_loss})
+            # cls_consistency_loss=self.cls_consistency_loss(\
+            #     self.student.model.pred_logits,self.teacher.model.pred_logits,self.student.loss.indices)
+            # losses.update({"loss_ce": cls_consistency_loss})
             consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
