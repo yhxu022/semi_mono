@@ -176,7 +176,7 @@ def main():
                                             start_factor=0.001,
                                             by_epoch=False,
                                             begin=0,
-                                            end=500),
+                                            end=cfg['lr_scheduler'].get('warmup_steps', 500)),
                                        dict(type='MultiStepLR',
                                             by_epoch=False,
                                             milestones=cfg["lr_scheduler"]["decay_list"],
@@ -196,12 +196,12 @@ def main():
                          start_factor=0.001,
                          by_epoch=False,
                          begin=0,
-                         end=500),
+                         end=cfg['lr_scheduler'].get('warmup_steps', 500)),
                     # 在 [232*10, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
                     dict(type='CosineAnnealingLR',
-                         T_max=cfg["trainer"]["max_iteration"] - 500,
+                         T_max=cfg["trainer"]["max_iteration"] - cfg['lr_scheduler'].get('warmup_steps', 500),
                          by_epoch=False,
-                         begin=500,
+                         begin=cfg['lr_scheduler'].get('warmup_steps', 500),
                          end=cfg["trainer"]["max_iteration"],
                          eta_min_ratio=0.001)
                 ]

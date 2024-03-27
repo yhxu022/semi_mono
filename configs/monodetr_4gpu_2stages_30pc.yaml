@@ -1,6 +1,9 @@
 random_seed: 1
 deterministic: False
 two_stages: True
+lr_scheduler: 
+  warmup_steps: 2320
+
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'
@@ -34,8 +37,8 @@ semi_train_cfg:
   sup_weight: 1 # 监督权重
   unsup_weight: 1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
-  depth_map_consistency_loss_weight: 0.5 #深度图一致性损失的权重
-  cls_consistency_loss_weight: 2 #分类一致性损失的权重
+  depth_map_consistency_loss_weight: 0.2 #深度图一致性损失的权重
+  cls_consistency_loss_weight: 1 #分类一致性损失的权重
   topk: 50
   cls_cls_pseudo_thr: 1 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
@@ -121,7 +124,7 @@ model:
 
 optimizer:
   type: 'AdamW'
-  lr: 0.0002
+  lr: 0.000002
   weight_decay: 0.0001
 
 trainer:
