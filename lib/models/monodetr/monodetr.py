@@ -277,13 +277,14 @@ class MonoDETR(nn.Module):
         out['pred_depth'] = outputs_depth[-1]
         out['pred_angle'] = outputs_angle[-1]
         out['pred_depth_map_logits'] = pred_depth_map_logits
-        if self.mode in ['get_pseudo_targets' , 'unsup_loss']:
-            self.depth_map_logits = pred_depth_map_logits
-
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(
                 outputs_class, outputs_coord, outputs_3d_dim, outputs_angle, outputs_depth)
-
+        if self.mode in ['get_pseudo_targets' , 'unsup_loss']:
+            self.depth_map_logits = pred_depth_map_logits
+            self.pred_logits = out["pred_logits"]
+            for aux_output in out['aux_outputs']:
+                self.pred_logits= torch.cat([self.pred_logits,aux_output['pred_logits']],dim=0)
         if self.two_stage:
             enc_outputs_coord = enc_outputs_coord_unact.sigmoid()
             out['enc_outputs'] = {'pred_logits': enc_outputs_class, 'pred_boxes': enc_outputs_coord}
@@ -350,7 +351,7 @@ class SetCriterion(nn.Module):
             # TODO this should probably be a separate loss, not hacked in this one here
             losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
         return losses
-
+    
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
         """ Compute the cardinality error, ie the absolute error in the number of predicted non-empty boxes
@@ -366,7 +367,6 @@ class SetCriterion(nn.Module):
         return losses
 
     def loss_3dcenter(self, outputs, targets, indices, num_boxes):
-        
         idx = self._get_src_permutation_idx(indices)
         src_3dcenter = outputs['pred_boxes'][:, :, 0: 2][idx]
         target_3dcenter = torch.cat([t['boxes_3d'][:, 0: 2][i] for t, (_, i) in zip(targets, indices)], dim=0)
@@ -488,7 +488,7 @@ class SetCriterion(nn.Module):
             'dims': self.loss_dims,
             'angles': self.loss_angles,
             'center': self.loss_3dcenter,
-            'depth_map': self.loss_depth_map,
+            'depth_map': self.loss_depth_map
         }
 
         assert loss in loss_map, f'do you really want to compute {loss} loss?'

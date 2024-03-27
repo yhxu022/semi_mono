@@ -116,7 +116,9 @@ def plot(jsonfile):
                 sup_loss_ce_1.append(new_data["sup_loss_ce_1"])
                 if "unsup_loss_ce" in  new_data:
                     unsup_loss_ce.append(new_data["unsup_loss_ce"])
+                if "unsup_loss_ce_0" in  new_data:
                     unsup_loss_ce_0.append(new_data["unsup_loss_ce_0"])
+                if "unsup_loss_ce_1" in  new_data:
                     unsup_loss_ce_1.append(new_data["unsup_loss_ce_1"])
                 sup_loss_bbox.append(new_data["sup_loss_bbox"])
                 sup_loss_bbox_0.append(new_data["sup_loss_bbox_0"])
@@ -292,7 +294,9 @@ def plot(jsonfile):
     plt.plot(train_iter, sup_loss_ce_1, label='sup_loss_ce_1')
     if len(unsup_loss_ce)>0:
         plt.plot(train_iter, unsup_loss_ce, label='unsup_loss_ce')
+    if len(unsup_loss_ce_0)>0:
         plt.plot(train_iter, unsup_loss_ce_0, label='unsup_loss_ce_0')
+    if len(unsup_loss_ce_1)>0:
         plt.plot(train_iter, unsup_loss_ce_1, label='unsup_loss_ce_1')
     plt.xlabel('train_iter')
     plt.ylabel('loss_ce')   
@@ -386,4 +390,4 @@ def plot(jsonfile):
     plt.legend()
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032712/20240327_125230/vis_data/20240327_125230.json")
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032720/20240327_202202/vis_data/20240327_202202.json")

@@ -89,8 +89,11 @@ class SemiBase3DDetector(BaseModel):
         self.student.val_nms = self.teacher.val_nms = self.semi_test_cfg.get('nms', False)
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
-        self.qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
+        self.depth_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
                                     loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
+                                    activated=False)
+        self.cls_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
+                                    loss_weight=self.semi_train_cfg.get('cls_consistency_loss_weight', 1.),\
                                     activated=False)
 
     def forward(self, inputs, calibs, targets, info, mode):
@@ -279,7 +282,8 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
         if mode=="cls":
-            self.student.loss.losses=['labels']
+            # self.student.loss.losses=['labels']
+            self.student.loss.losses=[]
         elif mode=="regression":
             #self.student.loss.losses=['boxes',  'dims', 'angles']
             self.student.loss.losses=['boxes','dims', 'angles', 'center']
@@ -306,11 +310,13 @@ class SemiBase3DDetector(BaseModel):
         # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
         if mode=="cls":
+            cls_consistency_loss=self.cls_consistency_loss(\
+                self.student.model.pred_logits,self.teacher.model.pred_logits,self.student.loss.indices)
+            losses.update({"loss_ce": cls_consistency_loss})
             consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,
         #  cls_score, topk_boxes,self.student.loss.indices)
-
             losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
                 'consistency_weight', 1.)})
         if mode=="regression":
@@ -341,8 +347,30 @@ class SemiBase3DDetector(BaseModel):
         # 保留最大值并将其余位置置零
         max_value, max_index = torch.max(teacher_depth_map, dim=-1)
         target=(max_index, max_value)
-        depth_map_consistency_loss=self.qfl(student_depth_map_logits,target)
+        depth_map_consistency_loss=self.depth_qfl(student_depth_map_logits,target)
         return depth_map_consistency_loss
+    
+    def query_consistency_loss(self,
+                         student_pred_logits,
+                         teacher_pred_logits,
+                         indices):
+        teacher_pred=teacher_pred_logits.sigmoid()
+        # 保留最大值并将其余位置置零
+        max_value, max_index = torch.max(torch.flatten(teacher_pred, start_dim=0, end_dim=1), dim=-1)
+        target=(max_index, max_value)
+        cls_consistency_loss=self.cls_qfl(torch.flatten(student_pred_logits, start_dim=0, end_dim=1),target)
+        return cls_consistency_loss
+    
+    def cls_consistency_loss(self,
+                         student_pred_logits,
+                         teacher_pred_logits,
+                         indices):
+        teacher_pred=teacher_pred_logits.sigmoid()
+        # 保留最大值并将其余位置置零
+        max_value, max_index = torch.max(torch.flatten(teacher_pred, start_dim=0, end_dim=1), dim=-1)
+        target=(max_index, max_value)
+        cls_consistency_loss=self.cls_qfl(torch.flatten(student_pred_logits, start_dim=0, end_dim=1),target)
+        return cls_consistency_loss
     
     def consistency_loss(self,
                          student_decoder_outputs,
