@@ -315,7 +315,7 @@ class SemiBase3DDetector(BaseModel):
                 'consistency_weight', 1.)})
         if mode=="regression":
             depth_map_consistency_loss=self.depth_map_consistency_loss\
-                (self.student.model.depth_map_logits,self.teacher.model.depth_map_logits)
+                (torch.flatten(self.student.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2),torch.flatten(self.teacher.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2))
             losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
@@ -338,13 +338,10 @@ class SemiBase3DDetector(BaseModel):
                          student_depth_map_logits,
                          teacher_depth_map_logits):
         teacher_depth_map=teacher_depth_map_logits.sigmoid()
-        # 找到最大值的索引
-        max_index = torch.argmax(teacher_depth_map, dim=1)
-        # 保留最大值，其他元素置零
-        target = torch.zeros_like(teacher_depth_map)
-        target.scatter_(1, max_index.unsqueeze(1), teacher_depth_map)
-        depth_map_consistency_loss=self.qfl(student_depth_map_logits.permute(0,2,3,1),\
-                                            target.permute(0,2,3,1))
+        # 保留最大值并将其余位置置零
+        max_value, max_index = torch.max(teacher_depth_map, dim=-1)
+        target=(max_index, max_value)
+        depth_map_consistency_loss=self.qfl(student_depth_map_logits,target)
         return depth_map_consistency_loss
     
     def consistency_loss(self,
