@@ -46,8 +46,14 @@ def build_dataloader(cfg, workers=16):
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         else:
             print(cfg['train_split'])
-            train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)
-            sampler = RandomSampler(train_set, replacement=True, num_samples=800000)
+            if cfg['train_split'] == '100pc+eigen_clean':
+                train_set_kitti3D = KITTI_Dataset(split='train', cfg=cfg)
+                train_set_eigen_clean = KITTI_Dataset(split='eigen_clean_sup', cfg=cfg)
+                train_set = ConcatDataset([train_set_kitti3D, train_set_eigen_clean])
+                sampler = RandomSampler(train_set, replacement=True, num_samples=800000)
+            else:
+                train_set = KITTI_Dataset(split=cfg['train_split'], cfg=cfg)
+                sampler = RandomSampler(train_set, replacement=True, num_samples=800000)
         test_set = KITTI_Dataset(split=cfg['test_split'], cfg=cfg)
     else:
         raise NotImplementedError("%s dataset is not supported" % cfg['type'])

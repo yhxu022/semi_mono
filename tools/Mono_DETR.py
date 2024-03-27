@@ -19,6 +19,9 @@ class Mono_DETR(BaseModel):
         self.max_objs = dataloader["dataset"].max_objs
 
     def forward(self, inputs, calibs, targets, info, mode):
+        self.model.mode=mode
+        self.model.pseudo_label_group_num=1
+        self.model.val_nms=1
         inputs=inputs[0]
         if mode == 'loss':
             img_sizes = targets['img_size']

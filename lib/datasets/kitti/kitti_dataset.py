@@ -48,7 +48,9 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial', 'eigen_clean', 'raw_mix']
+        assert self.split in ['train', 'val', 'trainval', 'test', 'semi_labeled', "semi_unlabeled", 'sup_partial',
+                              'eigen_clean',
+                              'raw_mix', 'eigen_clean_sup']
         if self.split in ['train', 'val', 'trainval', 'test', "eigen_clean", 'raw_mix']:
             self.split_file = os.path.join(self.root_dir, 'ImageSets', self.split + '.txt')
         elif self.split in ["semi_labeled", "sup_partial"]:
@@ -56,12 +58,14 @@ class KITTI_Dataset(data.Dataset):
         elif self.split == "semi_unlabeled":
             self.split_file = os.path.join(self.root_dir, 'semi_sets',
                                            f'train.{self.fold}@{self.percent}-unlabeled.txt')
+        elif self.split == 'eigen_clean_sup':
+            self.split_file = os.path.join(self.root_dir, 'ImageSets', "eigen_clean" + '.txt')
         self.idx_list = [x.strip() for x in open(self.split_file).readlines()]
 
         # path configuration
-        if self.split =='test':
+        if self.split == 'test':
             self.data_dir = os.path.join(self.root_dir, 'testing')
-        elif self.split == "eigen_clean":
+        elif self.split == "eigen_clean" or self.split == "eigen_clean_sup":
             self.data_dir = os.path.join(self.root_dir, "eigen_clean")
         elif self.split == "raw_mix":
             self.data_dir = os.path.join(self.root_dir, "raw_mix")
@@ -73,8 +77,8 @@ class KITTI_Dataset(data.Dataset):
         self.lidar_dir = os.path.join(self.data_dir, "velodyne")
         # data augmentation configuration
         self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-                                                   'sup_partial', "eigen_clean", "raw_mix"] else False
-        #验证集也做增强
+                                                   'sup_partial', "eigen_clean", "raw_mix", "eigen_clean_sup"] else False
+        # 验证集也做增强
         # self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
         #                                            'sup_partial', "eigen_clean", "raw_mix","val"] else False
         self.aug_pd = cfg.get('aug_pd', False)
@@ -103,7 +107,7 @@ class KITTI_Dataset(data.Dataset):
         self.clip_2d = cfg.get('clip_2d', False)
 
     def get_image(self, idx):
-        if self.split == "eigen_clean":
+        if self.split == "eigen_clean" or self.split == "eigen_clean_sup":
             img_file = os.path.join(self.image_dir, '{:010d}.png'.format(idx))
         else:
             img_file = os.path.join(self.image_dir, '%06d.png' % idx)
@@ -120,17 +124,17 @@ class KITTI_Dataset(data.Dataset):
         return get_objects_from_label(label_file)
 
     def get_calib(self, idx):
-        if self.split == "eigen_clean":
+        if self.split == "eigen_clean" or self.split == "eigen_clean_sup":
             calib_file = os.path.join(self.calib_dir, '{:010d}.txt'.format(idx))
         else:
             calib_file = os.path.join(self.calib_dir, '%06d.txt' % idx)
         assert os.path.exists(calib_file)
         return Calibration(calib_file)
-    
+
     def get_lidar(self, idx, dtype=np.float32, n_vec=4):
         lidar_filename = os.path.join(self.lidar_dir, "%06d.bin" % (idx))
         return load_velo_scan(lidar_filename, dtype, n_vec)
-    
+
     def eval(self, results_dir, logger):
         logger.info("==> Loading detections and GTs...")
         logger.info(f"==> from {results_dir}")
@@ -141,9 +145,9 @@ class KITTI_Dataset(data.Dataset):
         test_id = {'Car': 0, 'Pedestrian': 1, 'Cyclist': 2}
 
         logger.info('==> Evaluating (official) ...')
-        car_results_dict={}
+        car_results_dict = {}
         for category in self.writelist:
-            results_str, results_dict= get_official_eval_result(gt_annos, dt_annos, test_id[category])
+            results_str, results_dict = get_official_eval_result(gt_annos, dt_annos, test_id[category])
             if category == 'Car':
                 car_results_dict = results_dict
             logger.info(results_str)
@@ -195,7 +199,7 @@ class KITTI_Dataset(data.Dataset):
                             method=Image.AFFINE,
                             data=tuple(trans_inv.reshape(-1).tolist()),
                             resample=Image.BILINEAR)
-        if self.split in ["semi_unlabeled","eigen_clean", "raw_mix"]:
+        if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
             weak_img = weak_img.transform(tuple(self.resolution.tolist()),
                                           method=Image.AFFINE,
                                           data=tuple(trans_inv.reshape(-1).tolist()),
@@ -206,7 +210,7 @@ class KITTI_Dataset(data.Dataset):
         img = np.array(img).astype(np.float32) / 255.0
         img = (img - self.mean) / self.std
         img = img.transpose(2, 0, 1)  # C * H * W
-        if self.split in ["semi_unlabeled","eigen_clean", "raw_mix"]:
+        if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
             # if index==6926:
             # weak_img.save("result_weak.jpg")
             #     pass
@@ -254,8 +258,6 @@ class KITTI_Dataset(data.Dataset):
                     if object.alpha < -np.pi: object.alpha += 2 * np.pi
                     if object.ry > np.pi:  object.ry -= 2 * np.pi
                     if object.ry < -np.pi: object.ry += 2 * np.pi
-
-
 
             object_num = len(objects) if len(objects) < self.max_objs else self.max_objs
 
@@ -364,9 +366,9 @@ class KITTI_Dataset(data.Dataset):
         # collect return data
         inputs = img, img
         if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
-            #teacher student采用不同的增强
+            # teacher student采用不同的增强
             inputs = img, weak_img
-            #teacher student采用相同的增强
+            # teacher student采用相同的增强
             # inputs = img, img
         targets = {
             'calibs': calibs,
