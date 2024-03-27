@@ -70,11 +70,12 @@ def main():
     checkpoint = cfg["trainer"].get("pretrain_model", None)
 
     if cfg.get('evaluate_only', False):
-        os.makedirs("outputs_visual", exist_ok=True)
+        dir_name = "outputs_visual_eigen_clean"
+        os.makedirs(dir_name, exist_ok=True)
         print("start inference and visualize")
         print(f"loading from {checkpoint}")
         unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-        subset = Subset(unlabeled_dataset, range(40404))  # 3712 3769 14940 40404
+        subset = Subset(unlabeled_dataset, range(100))  # 3712 3769 14940 40404
         loader = DataLoader(dataset=subset,
                                 batch_size=1,
                                 num_workers=1,
@@ -137,16 +138,16 @@ def main():
                     gt_sum+=1
             img_bbox2d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="2D")
             img_bbox3d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="3D")
-            if(cfg["dataset"]["inference_split"] in ['test']):
-                img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
+            # if(cfg["dataset"]["inference_split"] in ['test']):
+            #     img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
             if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
-                img_bbox2d= show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="2D")
+                img_bbox2d= show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="2D")  # 绿色， GT
                 img_bbox3d= show_image_with_boxes(img_bbox3d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="3D")
-                img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file, objects_pred=objects)
-            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
-            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-            if(cfg["dataset"]["inference_split"] not in ['eigen_clean','raw_mix']):
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+                # img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file, objects_pred=objects)
+            cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+            cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+            # if(cfg["dataset"]["inference_split"] not in ['eigen_clean','raw_mix']):
+                # cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
         print("number of no predictions images:",sum)
         if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
             print("number of no gt images:",gt_sum)

@@ -132,7 +132,10 @@ class KITTI_Dataset(data.Dataset):
         return Calibration(calib_file)
 
     def get_lidar(self, idx, dtype=np.float32, n_vec=4):
-        lidar_filename = os.path.join(self.lidar_dir, "%06d.bin" % (idx))
+        if self.split == "eigen_clean_sup":
+            lidar_filename = os.path.join(self.lidar_dir, "%010d.bin" % (idx))
+        else:
+            lidar_filename = os.path.join(self.lidar_dir, "%06d.bin" % (idx))
         return load_velo_scan(lidar_filename, dtype, n_vec)
 
     def eval(self, results_dir, logger):

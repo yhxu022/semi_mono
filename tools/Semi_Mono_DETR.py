@@ -126,7 +126,8 @@ class Semi_Mono_DETR(BaseModel):
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                               self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
+                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"],
+                                                              self.cfg["semi_train_cfg"].get("depth_score_thr",0),info)
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -134,7 +135,8 @@ class Semi_Mono_DETR(BaseModel):
                                                                   self.cfg["semi_train_cfg"]['topk'])
                 dets = self.get_pseudo_targets_list_inference(dets, calibs, dets.shape[0],
                                                               self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
-                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"], info)
+                                                              self.cfg["semi_train_cfg"]["score_pseudo_thr"],
+                                                              self.cfg["semi_train_cfg"].get("depth_score_thr",0),info)
             return dets
 
         elif mode == 'unsup_loss':

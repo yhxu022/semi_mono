@@ -5,7 +5,7 @@ evaluate_only: True
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'
-  inference_split: "val"
+  inference_split: "eigen_clean_sup"
   fold: 1 #半监督有标签的折数1,2,3,4,5
   percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
   batch_size: 1
@@ -34,7 +34,7 @@ semi_train_cfg:
   topk: 50
   cls_pseudo_thr: 0.5 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
-  pseudo_label_group_num: 11
+  pseudo_label_group_num: 1
 
 semi_test_cfg: 
   predict_on: 'teacher'
@@ -106,7 +106,7 @@ trainer:
   val_iterval: 232
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
-  pretrain_model: "/home/xyh/MonoDETR_semi_baseline_33/ckpts/best_teacher_car_moderate_iter_41296.pth"
+#  pretrain_model: "/home/xyh/MonoDETR_semi_baseline_33/ckpts/best_teacher_car_moderate_iter_41296.pth"
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False
   scalar: 5

@@ -37,6 +37,10 @@ class Object3d(object):
             self.level_str = 'DontCare'
             return 0
 
+        if self.score != -1.0 and 0.2 >= self.score >= 0.0:
+            self.level_str = 'DontCare'
+            return 0
+
         if height >= 40 and self.trucation <= 0.15 and self.occlusion <= 0:
             self.level_str = 'Easy'
             return 1  # Easy
