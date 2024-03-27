@@ -16,7 +16,7 @@ from mmengine.model import BaseModel
 # from mmdet3d.models import Base3DDetector
 from lib.helpers.model_helper import build_model
 from tools.Semi_Mono_DETR_mask import Semi_Mono_DETR
-
+from mmdet.models.losses.gfocal_loss import QualityFocalLoss
 def affine_transform_tensor(pt, t):
     pt = torch.tensor([pt[0], pt[1], 1.], dtype=torch.float64, device=pt.device).unsqueeze(dim=0)
     t = torch.tensor(t, dtype=torch.float64).squeeze()
@@ -89,6 +89,9 @@ class SemiBase3DDetector(BaseModel):
         self.student.val_nms = self.teacher.val_nms = self.semi_test_cfg.get('nms', False)
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
+        self.qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
+                                    loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
+                                    activated=False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         """The unified entry for a forward process in both training and test.
@@ -310,6 +313,10 @@ class SemiBase3DDetector(BaseModel):
 
             losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
                 'consistency_weight', 1.)})
+        if mode=="regression":
+            depth_map_consistency_loss=self.depth_map_consistency_loss\
+                (self.student.model.depth_map_logits,self.teacher.model.depth_map_logits)
+            losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
         for name, loss in unsup_loss_dict.items():
@@ -326,11 +333,20 @@ class SemiBase3DDetector(BaseModel):
             # if 'loss_ce' in name and 'loss_center' not in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
+    
     def depth_map_consistency_loss(self,
                          student_depth_map_logits,
                          teacher_depth_map_logits):
-        depth_map_consistency_loss=1
+        # 找到最大值的索引
+        max_index = torch.argmax(teacher_depth_map_logits, dim=1)
+        # 保留最大值，其他元素置零
+        target = torch.zeros_like(teacher_depth_map_logits)
+        target.scatter_(1, max_index.unsqueeze(1), teacher_depth_map_logits)
+        depth_map_consistency_loss=self.qfl(student_depth_map_logits.permute(0,2,3,1),\
+                                            target.permute(0,2,3,1))\
+                                            /student_depth_map_logits.shape[0]/student_depth_map_logits.shape[2]/student_depth_map_logits.shape[3]
         return depth_map_consistency_loss
+    
     def consistency_loss(self,
                          student_decoder_outputs,
                          teacher_decoder_outputs,

@@ -378,19 +378,12 @@ def plot(jsonfile):
     plt.ylabel('loss_depth_map')
     plt.legend()
     plt.savefig(os.path.join(savedir,'loss_depth_map.png'), dpi=1000)
-
     plt.figure(16)
     plt.plot(step, teacher_Car_3d_moderate_R40, label='teacher_Car_3d_moderate_R40')
-    plt.plot(step, student_Car_3d_moderate_R40, label='teacher_Car_3d_moderate_R40')
+    plt.plot(step, student_Car_3d_moderate_R40, label='student_Car_3d_moderate_R40')
     plt.xlabel('step')
-    plt.ylabel('car_moderate')
+    plt.ylabel('Car_3d_moderate_R40')
     plt.legend()
-    plt.savefig(os.path.join(savedir, 'car_moderate.png'), dpi=1000)
+    plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
-    plot(
-
-        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_rawclean@032513_52/20240325_135305/vis_data/20240325_135305.json"
-
-
-
-    )
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032711/20240327_114918/vis_data/20240327_114918.json")

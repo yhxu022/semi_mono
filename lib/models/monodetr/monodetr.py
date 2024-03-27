@@ -277,6 +277,8 @@ class MonoDETR(nn.Module):
         out['pred_depth'] = outputs_depth[-1]
         out['pred_angle'] = outputs_angle[-1]
         out['pred_depth_map_logits'] = pred_depth_map_logits
+        if self.mode in ['get_pseudo_targets' , 'unsup_loss']:
+            self.depth_map_logits = pred_depth_map_logits
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(
