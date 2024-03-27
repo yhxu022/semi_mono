@@ -337,14 +337,14 @@ class SemiBase3DDetector(BaseModel):
     def depth_map_consistency_loss(self,
                          student_depth_map_logits,
                          teacher_depth_map_logits):
+        teacher_depth_map=teacher_depth_map_logits.sigmoid()
         # 找到最大值的索引
-        max_index = torch.argmax(teacher_depth_map_logits, dim=1)
+        max_index = torch.argmax(teacher_depth_map, dim=1)
         # 保留最大值，其他元素置零
-        target = torch.zeros_like(teacher_depth_map_logits)
-        target.scatter_(1, max_index.unsqueeze(1), teacher_depth_map_logits)
+        target = torch.zeros_like(teacher_depth_map)
+        target.scatter_(1, max_index.unsqueeze(1), teacher_depth_map)
         depth_map_consistency_loss=self.qfl(student_depth_map_logits.permute(0,2,3,1),\
-                                            target.permute(0,2,3,1))\
-                                            /student_depth_map_logits.shape[0]/student_depth_map_logits.shape[2]/student_depth_map_logits.shape[3]
+                                            target.permute(0,2,3,1))
         return depth_map_consistency_loss
     
     def consistency_loss(self,

@@ -386,4 +386,4 @@ def plot(jsonfile):
     plt.legend()
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032711/20240327_114918/vis_data/20240327_114918.json")
+    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032712/20240327_125230/vis_data/20240327_125230.json")

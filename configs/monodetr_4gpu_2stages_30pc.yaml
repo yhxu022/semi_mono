@@ -34,7 +34,7 @@ semi_train_cfg:
   sup_weight: 1 # 监督权重
   unsup_weight: 1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
-  depth_map_consistency_loss_weight: 1 #深度图一致性损失的权重
+  depth_map_consistency_loss_weight: 0.1 #深度图一致性损失的权重
   topk: 50
   cls_cls_pseudo_thr: 0.9 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
