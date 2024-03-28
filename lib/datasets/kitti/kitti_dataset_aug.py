@@ -72,11 +72,11 @@ class KITTI_Dataset(data.Dataset):
         self.label_dir = os.path.join(self.data_dir, 'label_2')
         self.lidar_dir = os.path.join(self.data_dir, "velodyne")
         # data augmentation configuration
-        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-                                                   'sup_partial', "eigen_clean", "raw_mix"] else False
+        #self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
+        #                                           'sup_partial', "eigen_clean", "raw_mix"] else False
         #验证集也做增强
-        # self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
-        #                                            'sup_partial', "eigen_clean", "raw_mix","val"] else False
+        self.data_augmentation = True if split in ['train', 'trainval', 'semi_labeled', "semi_unlabeled",
+                                                    'sup_partial', "eigen_clean", "raw_mix","val"] else False
         self.aug_pd = cfg.get('aug_pd', False)
         self.aug_crop = cfg.get('aug_crop', False)
         self.aug_calib = cfg.get('aug_calib', False)
@@ -136,18 +136,19 @@ class KITTI_Dataset(data.Dataset):
         logger.info(f"==> from {results_dir}")
         img_ids = [int(id) for id in self.idx_list]
         dt_annos = kitti.get_label_annos(results_dir)
-        gt_annos = kitti.get_label_annos(self.label_dir, img_ids)
-
+        objects_aug_save_dir=os.path.join(self.data_dir, 'labels_weak_aug_2')
+        # gt_annos = kitti.get_label_annos(self.label_dir, img_ids)
+        gt_annos = kitti.get_label_annos(objects_aug_save_dir, img_ids)
         test_id = {'Car': 0, 'Pedestrian': 1, 'Cyclist': 2}
 
         logger.info('==> Evaluating (official) ...')
-        car_moderate = 0
+        car_results_dict = {}
         for category in self.writelist:
-            results_str, results_dict, mAP3d_R40 = get_official_eval_result(gt_annos, dt_annos, test_id[category])
+            results_str, results_dict = get_official_eval_result(gt_annos, dt_annos, test_id[category])
             if category == 'Car':
-                car_moderate = mAP3d_R40
+                car_results_dict = results_dict
             logger.info(results_str)
-        return car_moderate
+        return car_results_dict
 
     def __len__(self):
         return self.idx_list.__len__()
@@ -258,20 +259,20 @@ class KITTI_Dataset(data.Dataset):
 
 
             object_num = len(objects) if len(objects) < self.max_objs else self.max_objs
-
             for i in range(object_num):
                 # filter objects by writelist
                 if objects[i].cls_type not in self.writelist:
                     continue
 
                 # filter inappropriate samples
-                if objects[i].level_str == 'UnKnown' or objects[i].pos[-1] < 2:
+                # if objects[i].level_str == 'UnKnown' or objects[i].pos[-1] < 2:
+                #     continue
+                if objects[i].level_str == 'UnKnown' :
                     continue
-
                 # ignore the samples beyond the threshold [hard encoding]
-                threshold = 65
-                if objects[i].pos[-1] > threshold:
-                    continue
+                # threshold = 65
+                # if objects[i].pos[-1] > threshold:
+                #     continue
 
                 # process 2d bbox & get 2d center
                 bbox_2d = objects[i].box2d.copy()
@@ -279,30 +280,32 @@ class KITTI_Dataset(data.Dataset):
                 # add affine transformation for 2d boxes.
                 bbox_2d[:2] = affine_transform(bbox_2d[:2], trans)
                 bbox_2d[2:] = affine_transform(bbox_2d[2:], trans)
-
+                objects[i].box2d = bbox_2d
                 # process 3d center
                 center_2d = np.array([(bbox_2d[0] + bbox_2d[2]) / 2, (bbox_2d[1] + bbox_2d[3]) / 2],
                                      dtype=np.float32)  # W * H
                 corner_2d = bbox_2d.copy()
-
+                ori_depth= objects[i].pos[-1]
                 center_3d = objects[i].pos + [0, -objects[i].h / 2, 0]  # real 3D center in 3D space
                 center_3d = center_3d.reshape(-1, 3)  # shape adjustment (N, 3)
-                center_3d, _ = calib.rect_to_img(center_3d)  # project 3D center to image plane
+                center_3d, depth_rect = calib.rect_to_img(center_3d)  # project 3D center to image plane
                 center_3d = center_3d[0]  # shape adjustment
                 if random_flip_flag and not self.aug_calib:  # random flip for center3d
                     center_3d[0] = img_size[0] - center_3d[0]
                 center_3d = affine_transform(center_3d.reshape(-1), trans)
-
+                center_3d_ori=calib.img_to_rect(center_3d[0], center_3d[1], depth_rect).reshape(-1)
+                objects[i].pos=center_3d_ori-[0, -objects[i].h / 2, 0]
+                objects[i].pos[-1]=ori_depth
                 # filter 3d center out of img
-                proj_inside_img = True
+                # proj_inside_img = True
 
-                if center_3d[0] < 0 or center_3d[0] >= self.resolution[0]:
-                    proj_inside_img = False
-                if center_3d[1] < 0 or center_3d[1] >= self.resolution[1]:
-                    proj_inside_img = False
+                # if center_3d[0] < 0 or center_3d[0] >= self.resolution[0]:
+                #     proj_inside_img = False
+                # if center_3d[1] < 0 or center_3d[1] >= self.resolution[1]:
+                #     proj_inside_img = False
 
-                if proj_inside_img == False:
-                    continue
+                # if proj_inside_img == False:
+                #     continue
 
                 # class
                 cls_id = self.cls2id[objects[i].cls_type]
@@ -344,7 +347,7 @@ class KITTI_Dataset(data.Dataset):
 
                 elif self.depth_scale == 'none':
                     depth[i] = objects[i].pos[-1]
-
+                objects[i].pos[-1]=depth[i]
                 # encoding heading angle
                 heading_angle = calib.ry2alpha(objects[i].ry, (objects[i].box2d[0] + objects[i].box2d[2]) / 2)
                 if heading_angle > np.pi:  heading_angle -= 2 * np.pi  # check range
@@ -360,7 +363,16 @@ class KITTI_Dataset(data.Dataset):
                     mask_2d[i] = 1
 
                 calibs[i] = calib.P2
-
+            if self.split == "val":
+                objects_aug = copy.deepcopy(objects)
+                objects_aug_save_dir=os.path.join(self.data_dir, 'labels_weak_aug_2')
+                if not os.path.exists(objects_aug_save_dir):
+                    os.makedirs(objects_aug_save_dir)
+                objects_aug_save_path = os.path.join(objects_aug_save_dir, '%06d.txt'% index)
+                with open(objects_aug_save_path, 'w') as f:
+                    for object in objects_aug:
+                        str=object.to_kitti_format()
+                        f.write(str + "\n")
         # collect return data
         inputs = img, img
         if self.split in ["semi_unlabeled", "eigen_clean", "raw_mix"]:
