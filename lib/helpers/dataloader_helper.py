@@ -1,9 +1,9 @@
 import numpy as np
 from torch.utils.data import DataLoader
 #一般训练时使用
-# from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
+from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 #测试Val图片做弱增强时使用
-from lib.datasets.kitti.kitti_dataset_aug import KITTI_Dataset
+# from lib.datasets.kitti.kitti_dataset_aug import KITTI_Dataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data.sampler import RandomSampler
 from tools.semi_sampler import Semi_Sampler

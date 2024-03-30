@@ -73,12 +73,12 @@ class SemiBase3DDetector(BaseModel):
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
         #支持加载MonoDETR官方训练权重
-        student_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
-        teacher_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
-        # check_point=torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')["state_dict"]
-        # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-        # student_model.load_state_dict(ckpt)
-        # teacher_model.load_state_dict(ckpt)
+        #student_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
+        #teacher_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
+        check_point=torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')["state_dict"]
+        ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+        student_model.load_state_dict(ckpt)
+        teacher_model.load_state_dict(ckpt)
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
         self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
         self.semi_train_cfg = semi_train_cfg
@@ -282,11 +282,14 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
         if mode=="cls":
-            self.student.loss.losses=['labels']
+            # self.student.loss.losses=['labels']
             # self.student.loss.losses=[]
+            #对象类别、2D尺寸和投影的3D中心归类为2D属性
+            self.student.loss.losses=['labels', 'boxes',  'center']
         elif mode=="regression":
             #self.student.loss.losses=['boxes',  'dims', 'angles']
-            self.student.loss.losses=['boxes','dims', 'angles', 'center']
+            #将深度、3D尺寸和方向归类为3D属性
+            self.student.loss.losses=['dims', 'angles']
             # self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
@@ -319,19 +322,20 @@ class SemiBase3DDetector(BaseModel):
         #  cls_score, topk_boxes,self.student.loss.indices)
             losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
                 'consistency_weight', 1.)})
+        #depth_map soft label
         if mode=="regression":
             depth_map_consistency_loss=self.depth_map_consistency_loss\
                 (torch.flatten(self.student.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2),torch.flatten(self.teacher.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2))
             losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        for name, loss in unsup_loss_dict.items():
+        # for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             # unsup深度loss置零,保留depth_map loss
-            if 'loss_depth' in name and "loss_depth_map" not in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            # if 'loss_depth' in name and "loss_depth_map" not in name:
+            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
             # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
