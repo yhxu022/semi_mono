@@ -30,7 +30,8 @@ dataset:
   shift: 0.05
 
   depth_scale: 'normal'
-
+  val_batch_size: 8
+  val_num_workers: 8
 semi_train_cfg: 
   sup_size: 2       
   freeze_teacher: True # 冻结教师
