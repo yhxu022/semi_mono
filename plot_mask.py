@@ -7,6 +7,7 @@ def plot(jsonfile):
     batch_unsup_gt_instances_num=[]
     batch_masked_pseudo_instances_num=[]
     batch_cls_unsup_pseudo_instances_num=[]
+    batch_gt_unsup_pseudo_instances_num=[]
     batch_regression_unsup_pseudo_instances_num=[]
     loss=[]
     train_iter=[]
@@ -34,6 +35,7 @@ def plot(jsonfile):
     student_Car_image_easy_R40=[]
     student_Car_image_moderate_R40=[]
     student_Car_image_hard_R40=[]
+
     step=[]
     lr=[]
     sup_loss_list = []
@@ -95,6 +97,8 @@ def plot(jsonfile):
                 new_data[ast.literal_eval(k)]=ast.literal_eval(data[k])
             if "batch_unsup_gt_instances_num" in new_data:
                 batch_unsup_gt_instances_num.append(new_data["batch_unsup_gt_instances_num"])
+            if "batch_gt_unsup_pseudo_instances_num" in new_data:
+                batch_gt_unsup_pseudo_instances_num.append(new_data["batch_gt_unsup_pseudo_instances_num"])
             if "batch_masked_pseudo_instances_num" in new_data:
                 batch_masked_pseudo_instances_num.append(new_data["batch_masked_pseudo_instances_num"])
             if "batch_cls_unsup_pseudo_instances_num" in new_data:
@@ -223,8 +227,12 @@ def plot(jsonfile):
     plt.figure(1)
     plt.plot(train_iter, batch_unsup_gt_instances_num, label='batch_unsup_gt_instances_num')
     plt.plot(train_iter, batch_masked_pseudo_instances_num, label="batch_masked_pseudo_instances_num")
-    plt.plot(train_iter, batch_cls_unsup_pseudo_instances_num, label="batch_cls_unsup_pseudo_instances_num")
-    plt.plot(train_iter, batch_regression_unsup_pseudo_instances_num, label="batch_regression_unsup_pseudo_instances_num")
+    if len(batch_cls_unsup_pseudo_instances_num) > 0:
+        plt.plot(train_iter, batch_cls_unsup_pseudo_instances_num, label="batch_cls_unsup_pseudo_instances_num")
+    if len(batch_gt_unsup_pseudo_instances_num) > 0 :
+        plt.plot(train_iter, batch_gt_unsup_pseudo_instances_num, label="batch_cls_unsup_pseudo_instances_num")
+    if len(batch_regression_unsup_pseudo_instances_num) > 0:
+        plt.plot(train_iter, batch_regression_unsup_pseudo_instances_num, label="batch_regression_unsup_pseudo_instances_num")
     plt.xlabel('train_iter')
     plt.ylabel('batch_unsup_instances_num')
     plt.legend()
@@ -233,7 +241,8 @@ def plot(jsonfile):
     plt.plot(train_iter, loss, label='loss')
     plt.plot(train_iter, sup_loss_list, label='sup_loss')
     plt.plot(train_iter, unsup_loss_list, label='unsup_loss')
-    plt.plot(train_iter, consisent_loss_list, label='consistent_loss')
+    if len(consisent_loss_list) > 0:
+        plt.plot(train_iter, consisent_loss_list, label='consistent_loss')
     plt.xlabel('train_iter')
     plt.ylabel('loss')   
     plt.legend()
@@ -390,4 +399,9 @@ def plot(jsonfile):
     plt.legend()
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
-    plot("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_2stages_30pc@032720/20240327_202202/vis_data/20240327_202202.json")
+    plot(
+        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_30pc@033100_00/20240331_000013/vis_data/20240331_000013.json"
+
+
+
+    )

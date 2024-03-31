@@ -4,9 +4,9 @@ two_stages: True
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'
-  train_split: 'semi_eigen_clean'
-#  fold: 1 #半监督有标签的折数1,2,3,4,5
-#  percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
+  train_split: 'semi'
+  fold: 1 #半监督有标签的折数1,2,3,4,5
+  percent: 30 #半监督的标签比例1,2,5,10,15,20,25,30,50
   test_split: 'val'
   batch_size: 4
   sup_size: 2
@@ -132,10 +132,11 @@ lr_scheduler:
   decay_rate: 0.1
 
   # if "in_proportion" is False:
-  decay_list: [4160, 5500]
+#  decay_list: [4160, 5500]
+  decay_list: [5000, 7500, 20000]
 
 trainer:
-  max_iteration: 20000
+  max_iteration: 30000
   val_begin: 0
   val_iterval: 232
   # save_interval: 22620 # checkpoint save interval (in iteration)

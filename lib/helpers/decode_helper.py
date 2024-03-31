@@ -4,6 +4,64 @@ import torch.nn as nn
 from lib.datasets.utils import class2angle
 from utils import box_ops
 
+import torch
+
+def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
+    '''
+    NOTE: THIS IS A TENSOR FUNCTION
+    Assume calibs is a list of objects that have a method img_to_rect accepting and returning Tensors,
+    and get_heading_angle is modified to work with Tensors.
+    '''
+    results = {}
+    cls_scores = {}
+    depth_score = {}
+    scores = {}
+    for i in range(dets.shape[0]):  # batch
+        preds = []
+        cls_scores_list = []
+        depth_score_list = []
+        score_list = []
+        for j in range(dets.shape[1]):  # max_dets
+            cls_id = int(dets[i, j, 0].item())
+            cls_score = dets[i, j, 1]
+            if cls_score < threshold:
+                continue
+
+            # 2d bboxs decoding
+            x = dets[i, j, 2] * info['img_size'][i][0]
+            y = dets[i, j, 3] * info['img_size'][i][1]
+            w = dets[i, j, 4] * info['img_size'][i][0]
+            h = dets[i, j, 5] * info['img_size'][i][1]
+            bbox = torch.tensor([x - w / 2, y - h / 2, x + w / 2, y + h / 2], device=dets.device)
+
+            # 3d bboxs decoding
+            depth = dets[i, j, 6]
+
+            # dimensions decoding
+            dimensions = dets[i, j, 31:34] + cls_mean_size[cls_id]
+
+            # positions decoding
+            x3d = dets[i, j, 34] * info['img_size'][i][0]
+            y3d = dets[i, j, 35] * info['img_size'][i][1]
+            locations = calibs[i].img_to_rect_gpu(x3d, y3d, depth)
+            locations[1] += dimensions[0] / 2
+
+            # heading angle decoding
+            alpha = get_heading_angle(dets[i, j, 7:31])
+            ry = calibs[i].alpha2ry(alpha, x)
+
+            score = cls_score * dets[i, j, -1]
+            pred = torch.cat([torch.tensor([cls_id, alpha], device=dets.device), bbox, dimensions, locations, torch.tensor([ry, score], device=dets.device)])
+            preds.append(pred)
+            cls_scores_list.append(cls_score)
+            depth_score_list.append(dets[i, j, -1])
+            score_list.append(score)
+        results[info['img_id'][i]] = torch.stack(preds)
+        cls_scores[info['img_id'][i]] = torch.tensor(cls_scores_list, device=dets.device)
+        depth_score[info['img_id'][i]] = torch.tensor(depth_score_list, device=dets.device)
+        scores[info['img_id'][i]] = torch.tensor(score_list, device=dets.device)
+    return results, cls_scores, depth_score, scores
+
 
 def decode_detections(dets, info, calibs, cls_mean_size, threshold):
     '''

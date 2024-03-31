@@ -34,9 +34,10 @@ semi_train_cfg:
   sup_weight: 1 # 监督权重
   unsup_weight: 1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
-  depth_map_consistency_loss_weight: 0.0 #深度图一致性损失的权重
+  depth_map_consistency_loss_weight: 0.5 #深度图一致性损失的权重
+  cls_consistency_loss_weight: 1 #分类一致性损失的权重
   topk: 50
-  cls_cls_pseudo_thr: 0.4 # 用于分类的类pseudobox 阈值
+  cls_cls_pseudo_thr: 0.2 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox 阈值
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
   regression_cls_pseudo_thr: 0.1 # 用于回归的类pseudobox 阈值
@@ -120,7 +121,7 @@ model:
 
 optimizer:
   type: 'AdamW'
-  lr: 0.0002  #2e-6
+  lr: 0.000002  #2e-6
   weight_decay: 0.0001
 
 lr_scheduler:
@@ -132,15 +133,16 @@ lr_scheduler:
   decay_rate: 0.1
 
   # if "in_proportion" is False:
-  decay_list: [4160, 5500]
+#  decay_list: [4160, 5500]
+  decay_list: [4500, 6000]
 
 trainer:
-  max_iteration: 20000
+  max_iteration: 10000
   val_begin: 0
   val_iterval: 232
   # save_interval: 22620 # checkpoint save interval (in iteration)
   # resume_model: True
-  #pretrain_model: /data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth
+  pretrain_model: "/home/xyh/MonoDETR_semi_baseline_33/ckpts/NO82_iter_6500.pth"
   save_all: False  # False for only savng the best and latest ckpts
   use_dn: False
   scalar: 5

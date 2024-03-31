@@ -170,6 +170,10 @@ def main():
                  interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
         ]
         if cfg.get('two_stages', False) == True:
+            if cfg['lr_scheduler'].get('in_proportion', False) is True:
+                milestone = [int(cfg["trainer"]["max_iteration"] * 0.641), int(cfg["trainer"]["max_iteration"] * 0.846)]
+            else:
+                milestone = cfg["lr_scheduler"]["decay_list"]
             if cfg['lr_scheduler'].get('type', None) == 'step':
                 if cfg['lr_scheduler'].get('warmup', None) is True:
                     param_scheduler = [dict(type='LinearLR',
@@ -179,14 +183,14 @@ def main():
                                             end=cfg['lr_scheduler'].get('warmup_steps', 500)),
                                        dict(type='MultiStepLR',
                                             by_epoch=False,
-                                            milestones=cfg["lr_scheduler"]["decay_list"],
+                                            milestones=milestone,
                                             gamma=cfg["lr_scheduler"]["decay_rate"]),
                                        ]
                 else:
                     param_scheduler = [
                                        dict(type='MultiStepLR',
                                             by_epoch=False,
-                                            milestones=cfg["lr_scheduler"]["decay_list"],
+                                            milestones=milestone,
                                             gamma=cfg["lr_scheduler"]["decay_rate"]),
                                        ]
 
@@ -285,6 +289,9 @@ def main():
                                                     method_name='mean',
                                                     window_size=50),
                                                dict(data_src='batch_unsup_gt_instances_num',
+                                                    method_name='mean',
+                                                    window_size=50),
+                                               dict(data_src='batch_gt_unsup_pseudo_instances_num',
                                                     method_name='mean',
                                                     window_size=50),
                                            ]),

@@ -386,7 +386,9 @@ class KITTI_Dataset(data.Dataset):
             'src_size_3d': src_size_3d,
             'heading_bin': heading_bin,
             'heading_res': heading_res,
-            'mask_2d': mask_2d}
+            'mask_2d': mask_2d,
+            'img_id': index
+        }
 
         info = {'img_id': index,
                 'img_size': img_size,

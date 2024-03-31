@@ -67,12 +67,12 @@ class SemiBase3DDetector(BaseModel):
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
         #支持加载MonoDETR官方训练权重
-        student_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
-        teacher_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
-        # check_point=torch.load('/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth')["state_dict"]
-        # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-        # student_model.load_state_dict(ckpt)
-        # teacher_model.load_state_dict(ckpt)
+        # student_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
+        # teacher_model.load_state_dict(torch.load('/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth')['model_state'])
+        check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
+        ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+        student_model.load_state_dict(ckpt)
+        teacher_model.load_state_dict(ckpt)
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
         self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
         self.semi_train_cfg = semi_train_cfg
@@ -190,13 +190,13 @@ class SemiBase3DDetector(BaseModel):
         pseudo_targets_list, mask, cls_score, topk_boxes = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
         # 用伪标签监督
-        losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info))
+        # losses.update(**self.loss_by_pseudo_instances(
+        #     student_inputs, unsup_calibs, pseudo_targets_list, mask, cls_score, topk_boxes, unsup_info))
 
         # 用GT监督
-        # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
+        unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
+        losses.update(**self.loss_by_pseudo_instances(
+            student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
         return losses
 
     def loss_by_gt_instances(self,

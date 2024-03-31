@@ -22,9 +22,9 @@ from lib.helpers.tester_helper import Tester
 from tools.KITTI_METRIC import KITTI_METRIC
 from mmengine.runner import Runner
 from mmengine.logging import MMLogger
-#Mask掉歧义的物体
-# from tools.semi_base3d_mask import SemiBase3DDetector
-from tools.semi_base3d import SemiBase3DDetector
+# Mask掉歧义的物体
+from tools.semi_base3d_clsGT import SemiBase3DDetector
+# from tools.semi_base3d import SemiBase3DDetector
 from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
 from tools.hook.mean_teacher_hook import MeanTeacherHook
@@ -37,6 +37,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Subset
 import time
 from tqdm import tqdm
+
 parser = argparse.ArgumentParser(description='Depth-aware Transformer for Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
@@ -63,52 +64,52 @@ def main():
         output_path = os.path.join('./' + 'outputs', config_name + '@' + datetime.datetime.now().strftime('%m%d%H_%M'))
     os.makedirs(output_path, exist_ok=True)
     shutil.copy(args.config, output_path)
-    shutil.copy(os.path.join('tools', 'semi_base3d.py'), output_path)
-    shutil.copy(os.path.join('tools', 'Semi_Mono_DETR.py'), output_path)
+    shutil.copy(os.path.join('tools', 'semi_base3d_clsGT.py'), output_path)
+    shutil.copy(os.path.join('tools', 'Semi_Mono_DETR_clsGT.py'), output_path)
     log_file = os.path.join(output_path, 'train.log')
     logger = MMLogger.get_instance('mmengine', log_file=log_file, log_level='INFO')
     checkpoint = cfg["trainer"].get("pretrain_model", None)
 
     if cfg.get('evaluate_only', False):
-        dir_name = "outputs_visual_eigen_clean"
-        os.makedirs(dir_name, exist_ok=True)
+        os.makedirs("outputs_visual", exist_ok=True)
         print("start inference and visualize")
         print(f"loading from {checkpoint}")
         unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-        subset = Subset(unlabeled_dataset, range(100))  # 3712 3769 14940 40404
+        subset = Subset(unlabeled_dataset, range(40404))  # 3712 3769 14940 40404
         loader = DataLoader(dataset=subset,
-                                batch_size=1,
-                                num_workers=1,
-                                shuffle=False,
-                                pin_memory=True,
-                                drop_last=False,
-                                persistent_workers=True)
-        model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"],cfg["semi_test_cfg"], inference_set=subset.dataset).to('cuda')
+                            batch_size=1,
+                            num_workers=1,
+                            shuffle=False,
+                            pin_memory=True,
+                            drop_last=False,
+                            persistent_workers=True)
+        model = SemiBase3DDetector(cfg, cfg['model'], loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
+                                   inference_set=subset.dataset).to('cuda')
         if checkpoint is not None:
             ckpt = torch.load(checkpoint)
             model.load_state_dict(ckpt['state_dict'])
-        gt_sum=sum=0
+        gt_sum = sum = 0
         for inputs, calib, targets, info in tqdm(loader):
             input_teacher = inputs[1]
             input_teacher = input_teacher.to("cuda")
             calib = calib.to("cuda")
             # targets = targets.to("cuda")
-            id=int(info['img_id'])
+            id = int(info['img_id'])
             info['img_size'] = info['img_size'].to("cuda")
             img = subset.dataset.get_image(id)
             img_from_file = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
             calibs_from_file = subset.dataset.get_calib(id)
             pc_velo = subset.dataset.get_lidar(id)
             dets = model.teacher(input_teacher, calib, targets, info, mode='inference')
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
-                gt_objects=subset.dataset.get_label(id)
-                gt_objects_filtered=[]
+            if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+                gt_objects = subset.dataset.get_label(id)
+                gt_objects_filtered = []
                 for i in range(len(gt_objects)):
                     # filter objects by writelist
-                    if  gt_objects[i].cls_type not in subset.dataset.writelist:
+                    if gt_objects[i].cls_type not in subset.dataset.writelist:
                         continue
                     # filter inappropriate samples
-                    if  gt_objects[i].level_str == 'UnKnown' or  gt_objects[i].pos[-1] < 2:
+                    if gt_objects[i].level_str == 'UnKnown' or gt_objects[i].pos[-1] < 2:
                         continue
                     # ignore the samples beyond the threshold [hard encoding]
                     threshold = 65
@@ -132,26 +133,29 @@ def main():
                 object = Object3d_pred(det)
                 objects.append(object)
             if len(objects) == 0:
-                sum+=1
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
+                sum += 1
+            if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
                 if len(gt_objects_filtered) == 0:
-                    gt_sum+=1
-            img_bbox2d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="2D")
-            img_bbox3d= show_image_with_boxes(img_from_file, objects, calibs_from_file,color=(0,0,255),mode="3D")
-            if(cfg["dataset"]["inference_split"] in ['test']):
+                    gt_sum += 1
+            img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
+            img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
+            if (cfg["dataset"]["inference_split"] in ['test']):
                 img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
-            if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
-                img_bbox2d= show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="2D")  # 绿色， GT
-                img_bbox3d= show_image_with_boxes(img_bbox3d, gt_objects_filtered, calibs_from_file,color=(0,255,0),mode="3D")
-                img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file, objects_pred=objects)
-            cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
-            cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-            if(cfg["dataset"]["inference_split"] not in ['eigen_clean','raw_mix']):
-                cv2.imwrite(f'{dir_name}/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
-        print("number of no predictions images:",sum)
-        if(cfg["dataset"]["inference_split"] not in ['test','eigen_clean','raw_mix']):
-            print("number of no gt images:",gt_sum)
-        print("number of total images:",len(subset))
+            if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+                img_bbox2d = show_image_with_boxes(img_bbox2d, gt_objects_filtered, calibs_from_file, color=(0, 255, 0),
+                                                   mode="2D")
+                img_bbox3d = show_image_with_boxes(img_bbox3d, gt_objects_filtered, calibs_from_file, color=(0, 255, 0),
+                                                   mode="3D")
+                img_bev = show_lidar_topview_with_boxes(pc_velo, gt_objects_filtered, calibs_from_file,
+                                                        objects_pred=objects)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+            if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+        print("number of no predictions images:", sum)
+        if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+            print("number of no gt images:", gt_sum)
+        print("number of total images:", len(subset))
         return
     # build dataloader
     train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
@@ -165,35 +169,60 @@ def main():
             dict(type="MeanTeacherHook", momentum=cfg["mean_teacher_hook"]["momentum"],
                  interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
         ]
-        if cfg.get('two_stages',False)==True:
-            param_scheduler=[# 在 [0, 232*10) 迭代时使用线性学习率
-                            dict(type='LinearLR',
-                            start_factor=0.001,
-                            by_epoch=False,
-                            begin=0,
-                            end=2320),
-                            # 在 [232*10, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
-                            dict(type='CosineAnnealingLR',
-                            T_max=cfg["trainer"]["max_iteration"]-2320,
-                            by_epoch=False,
-                            begin=2320,
-                            end=cfg["trainer"]["max_iteration"],
-                            eta_min_ratio=0.001)
-                    ]
+        if cfg.get('two_stages', False) == True:
+            if cfg['lr_scheduler'].get('in_proportion', False) is True:
+                milestone = [int(cfg["trainer"]["max_iteration"] * 0.641), int(cfg["trainer"]["max_iteration"] * 0.846)]
+            else:
+                milestone = cfg["lr_scheduler"]["decay_list"]
+            if cfg['lr_scheduler'].get('type', None) == 'step':
+                if cfg['lr_scheduler'].get('warmup', None) is True:
+                    param_scheduler = [dict(type='LinearLR',
+                                            start_factor=0.001,
+                                            by_epoch=False,
+                                            begin=0,
+                                            end=cfg['lr_scheduler'].get('warmup_steps', 500)),
+                                       dict(type='MultiStepLR',
+                                            by_epoch=False,
+                                            milestones=milestone,
+                                            gamma=cfg["lr_scheduler"]["decay_rate"]),
+                                       ]
+                else:
+                    param_scheduler = [
+                                       dict(type='MultiStepLR',
+                                            by_epoch=False,
+                                            milestones=milestone,
+                                            gamma=cfg["lr_scheduler"]["decay_rate"]),
+                                       ]
+
+            else:
+                param_scheduler = [  # 在 [0, 232*10) 迭代时使用线性学习率
+                    dict(type='LinearLR',
+                         start_factor=0.001,
+                         by_epoch=False,
+                         begin=0,
+                         end=cfg['lr_scheduler'].get('warmup_steps', 500)),
+                    # 在 [232*10, cfg["trainer"]["max_iteration"]) 迭代时使用余弦学习率
+                    dict(type='CosineAnnealingLR',
+                         T_max=cfg["trainer"]["max_iteration"] - cfg['lr_scheduler'].get('warmup_steps', 500),
+                         by_epoch=False,
+                         begin=cfg['lr_scheduler'].get('warmup_steps', 500),
+                         end=cfg["trainer"]["max_iteration"],
+                         eta_min_ratio=0.001)
+                ]
         else:
             if cfg['lr_scheduler'].get('type', None) == 'step':
                 print("use MultiStepLR")
-                param_scheduler=dict(type='MultiStepLR',
-                    by_epoch=False,
-                    milestones=cfg["lr_scheduler"]["decay_list"],
-                    gamma=cfg["lr_scheduler"]["decay_rate"]),
+                param_scheduler = dict(type='MultiStepLR',
+                                       by_epoch=False,
+                                       milestones=cfg["lr_scheduler"]["decay_list"],
+                                       gamma=cfg["lr_scheduler"]["decay_rate"]),
             elif cfg['lr_scheduler'].get('type', None) == 'cos':
                 print("use CosineAnnealingLR")
-                param_scheduler=dict(type='CosineAnnealingLR',
-                    T_max=cfg["trainer"]["max_iteration"] - 10000,
-                    by_epoch=False,
-                    begin=10000,
-                    end=cfg["trainer"]["max_iteration"]),
+                param_scheduler = dict(type='CosineAnnealingLR',
+                                       T_max=cfg["trainer"]["max_iteration"] - 10000,
+                                       by_epoch=False,
+                                       begin=10000,
+                                       end=cfg["trainer"]["max_iteration"]),
             else:
                 raise RuntimeError("No lr scheduler")
         runner = Runner(model=model,
@@ -217,7 +246,7 @@ def main():
                                            paramwise_cfg=dict(bias_decay_mult=0,
                                                               norm_decay_mult=0,
                                                               bypass_duplicate=True)),
-                        param_scheduler = param_scheduler,
+                        param_scheduler=param_scheduler,
                         train_cfg=dict(by_epoch=False,
                                        max_iters=cfg["trainer"]["max_iteration"],
                                        val_begin=cfg["trainer"].get('val_begin', 1),
@@ -250,7 +279,13 @@ def main():
                         log_processor=dict(window_size=50,
                                            by_epoch=False,
                                            custom_cfg=[
-                                               dict(data_src='batch_unsup_pseudo_instances_num',
+                                               dict(data_src='batch_regression_unsup_pseudo_instances_num',
+                                                    method_name='mean',
+                                                    window_size=50),
+                                               dict(data_src='batch_masked_pseudo_instances_num',
+                                                    method_name='mean',
+                                                    window_size=50),
+                                               dict(data_src='batch_cls_unsup_pseudo_instances_num',
                                                     method_name='mean',
                                                     window_size=50),
                                                dict(data_src='batch_unsup_gt_instances_num',

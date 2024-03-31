@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+import torch
 ################  Object3D  ##################
 
 def get_objects_from_label(label_file):
@@ -37,7 +37,7 @@ class Object3d(object):
             self.level_str = 'DontCare'
             return 0
 
-        if self.score != -1.0 and 0.2 >= self.score >= 0.0:
+        if self.score != -1.0 and 0.7 >= self.score >= 0.0:
             self.level_str = 'DontCare'
             return 0
 
@@ -211,6 +211,18 @@ class Calibration(object):
         x = ((u - self.cu) * depth_rect) / self.fu + self.tx
         y = ((v - self.cv) * depth_rect) / self.fv + self.ty
         pts_rect = np.concatenate((x.reshape(-1, 1), y.reshape(-1, 1), depth_rect.reshape(-1, 1)), axis=1)
+        return pts_rect
+
+    def img_to_rect_gpu(self, u, v, depth_rect):
+        """
+        :param u: (N)
+        :param v: (N)
+        :param depth_rect: (N)
+        :return:
+        """
+        x = ((u - self.cu) * depth_rect) / self.fu + self.tx
+        y = ((v - self.cv) * depth_rect) / self.fv + self.ty
+        pts_rect = torch.stack((x, y, depth_rect), dim=1)
         return pts_rect
 
     def depthmap_to_rect(self, depth_map):
