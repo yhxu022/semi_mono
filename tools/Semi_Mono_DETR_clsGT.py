@@ -20,22 +20,7 @@ def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
 
     return angle
 
-def rect_to_lidar_gpu(calib, pts_rect):
-    """
-    Convert rectified camera coordinates to LiDAR coordinates.
-    Assume pts_rect is a Tensor [N, 3] and on the correct device (GPU).
-    """
-    # Matrix inverse and dot product
-    R0_inv = torch.inverse(calib.R0)
-    pts_ref = torch.mm(pts_rect, R0_inv.T)  # Using torch.mm for matrix multiplication
 
-    # Convert Cartesian to homogeneous coordinates
-    pts_ref_hom = calib.cart_to_hom(pts_ref)  # Assuming cart_to_hom is adapted for Tensors
-
-    # Dot product to transform to LiDAR coordinates
-    lidar_coords = torch.mm(pts_ref_hom, calib.C2V.T)
-
-    return lidar_coords
 
 def alpha2ry_gpu(calib, alpha, u):
     """
@@ -64,7 +49,7 @@ def alpha2ry_gpu(calib, alpha, u):
     return ry
 
 class Semi_Mono_DETR(BaseModel):
-    def __init__(self, model, loss, cfg, dataloader, inference_set=None):
+    def __init__(self, model, loss, cfg, dataloader, inference_set=None, unlabeled_set=None):
         super().__init__()
         self.uncertainty_estimator = UncertaintyEstimator()
         self.model = model
@@ -78,6 +63,7 @@ class Semi_Mono_DETR(BaseModel):
         # self.max_objs = dataloader["dataset"].max_objs
         self.max_objs = 50
         self.inference_set = inference_set
+        self.unlabeled_set = unlabeled_set
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -345,8 +331,7 @@ class Semi_Mono_DETR(BaseModel):
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
             dets = batch_dets[bz]
-            calibs = batch_calibs[bz]
-            target = batch_targets[bz]
+            target = {key: val[bz] for key, val in batch_targets.items()}
             pseudo_labels = dets[:, 0]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
@@ -368,6 +353,10 @@ class Semi_Mono_DETR(BaseModel):
 
 
             # 把target和伪标签做iou，使得分类一定正确
+            device = dets.device
+            dets = dets.unsqueeze(0)
+            # calibs = target['calibs']
+            calibs = [self.unlabeled_set.get_calib(index) for index in target['img_id'].unsqueeze(0)]
             mask_cls_gt = np.zeros((len(dets[:, 0])), dtype=bool)
             cls_mean_size = torch.zeros((3, 3), device=device)
             dets_decode, cls_scores, depth_score_list, scores = decode_detections_GPU(
@@ -377,8 +366,8 @@ class Semi_Mono_DETR(BaseModel):
                 cls_mean_size=cls_mean_size,
                 threshold=self.cfg["tester"].get('threshold', 0.2))
 
-            calib = calibs[0]
             dets_img = dets_decode[int(target['img_id'])]
+            calib = calibs[0]
             if len(dets_img) >= 1:
                 device = dets_img.device
                 dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
@@ -387,7 +376,7 @@ class Semi_Mono_DETR(BaseModel):
                 w = dets_img[:, 7:8]
                 l = dets_img[:, 8:9]
                 ry = dets_img[:, 12:13]
-                loc_lidar = rect_to_lidar_gpu(calib,loc)
+                loc_lidar = calib.rect_to_lidar_gpu(loc)
                 loc_lidar[:, 2] += h[:, 0] / 2
                 heading = -(torch.pi / 2 + ry)
                 boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
@@ -401,9 +390,9 @@ class Semi_Mono_DETR(BaseModel):
                 z_3d_gt = target['depth']
                 alpha_gt = class2angle_gpu(cls=target['heading_bin'],residual=target['heading_res'])
                 x_gt = target['boxes'][0]
-                ry_gt = alpha2ry_gpu(calib, alpha_gt, x_gt)
+                ry_gt = alpha2ry_gpu(calibs, alpha_gt, x_gt)
                 loc_gt = torch.stack([x_3d_gt, y_3d_gt, z_3d_gt], dim=0).to(device)
-                loc_lidar_gt = rect_to_lidar_gpu(calib, loc_gt)
+                loc_lidar_gt = calib.rect_to_lidar_gpu(loc_gt)
                 loc_lidar_gt[:, 2] += h_gt[:, 0] / 2
                 heading_gt = -(torch.pi / 2 + ry_gt)
                 boxes_lidar_gt = torch.concatenate([loc_lidar_gt, l_gt, w_gt, h_gt, heading_gt], axis=1)

@@ -49,6 +49,7 @@ def build_dataloader(cfg, workers=16):
             sampler = Semi_Sampler(len(labeled_dataset), len(unlabeled_dataset), cfg['batch_size'], cfg['sup_size'])
         else:
             print(cfg['train_split'])
+            unlabeled_dataset = None
             if cfg['train_split'] == '100pc+eigen_clean':
                 train_set_kitti3D = KITTI_Dataset(split='train', cfg=cfg)
                 train_set_eigen_clean = KITTI_Dataset(split='eigen_clean_sup', cfg=cfg)
@@ -79,4 +80,7 @@ def build_dataloader(cfg, workers=16):
         collate_fn=dict(type='default_collate'),
         persistent_workers=True
     )
-    return train_set, test_dataloader, sampler
+    if cfg.get('cls_GT', False) is True:
+        return train_set, test_dataloader, sampler, unlabeled_dataset
+    else:
+        return train_set, test_dataloader, sampler

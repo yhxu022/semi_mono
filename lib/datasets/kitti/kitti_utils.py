@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 import torch
+
+
 ################  Object3D  ##################
 
 def get_objects_from_label(label_file):
@@ -29,7 +31,6 @@ class Object3d(object):
         self.level_str = None
         self.level = self.get_obj_level()
 
-
     def get_obj_level(self):
         height = float(self.box2d[3]) - float(self.box2d[1]) + 1
 
@@ -54,7 +55,6 @@ class Object3d(object):
             self.level_str = 'UnKnown'
             return 4
 
-
     def generate_corners3d(self):
         """
         generate corners3d representation for this object
@@ -73,7 +73,6 @@ class Object3d(object):
         corners3d = corners3d + self.pos
         return corners3d
 
-
     def to_bev_box2d(self, oblique=True, voxel_size=0.1):
         """
         :param bev_shape: (2) for bev shape (h, w), => (y_max, x_max) in image
@@ -86,7 +85,8 @@ class Object3d(object):
             xz_corners = corners3d[0:4, [0, 2]]
             box2d = np.zeros((4, 2), dtype=np.int32)
             box2d[:, 0] = ((xz_corners[:, 0] - Object3d.MIN_XZ[0]) / voxel_size).astype(np.int32)
-            box2d[:, 1] = Object3d.BEV_SHAPE[0] - 1 - ((xz_corners[:, 1] - Object3d.MIN_XZ[1]) / voxel_size).astype(np.int32)
+            box2d[:, 1] = Object3d.BEV_SHAPE[0] - 1 - ((xz_corners[:, 1] - Object3d.MIN_XZ[1]) / voxel_size).astype(
+                np.int32)
             box2d[:, 0] = np.clip(box2d[:, 0], 0, Object3d.BEV_SHAPE[1])
             box2d[:, 1] = np.clip(box2d[:, 1], 0, Object3d.BEV_SHAPE[0])
         else:
@@ -100,13 +100,11 @@ class Object3d(object):
 
         return box2d
 
-
     def to_str(self):
         print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \
-                     % (self.cls_type, self.trucation, self.occlusion, self.alpha, self.box2d, self.h, self.w, self.l,
-                        self.pos, self.ry)
+                    % (self.cls_type, self.trucation, self.occlusion, self.alpha, self.box2d, self.h, self.w, self.l,
+                       self.pos, self.ry)
         return print_str
-
 
     def to_kitti_format(self):
         kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
@@ -114,7 +112,6 @@ class Object3d(object):
                        self.box2d[2], self.box2d[3], self.h, self.w, self.l, self.pos[0], self.pos[1], self.pos[2],
                        self.ry)
         return kitti_str
-
 
 
 ###################  calibration  ###################
@@ -166,6 +163,16 @@ class Calibration(object):
         pts_hom = np.hstack((pts, np.ones((pts.shape[0], 1), dtype=np.float32)))
         return pts_hom
 
+    def cart_to_hom_gpu(self, pts):
+        """
+        :param pts: (N, 3 or 2)
+        :return pts_hom: (N, 4 or 3)
+        """
+        device = pts.device
+        ones = torch.ones((pts.shape[0], 1), device=device, dtype=torch.float32)
+        pts_hom = torch.cat((pts, ones), dim=1)
+        return pts_hom
+
     def lidar_to_rect(self, pts_lidar):
         """
         :param pts_lidar: (N, 3)
@@ -180,6 +187,21 @@ class Calibration(object):
         pts_ref = np.transpose(np.dot(np.linalg.inv(self.R0), np.transpose(pts_rect)))
         pts_ref = self.cart_to_hom(pts_ref)  # nx4
         return np.dot(pts_ref, np.transpose(self.C2V))
+
+    def rect_to_lidar_gpu(self, pts_rect):
+        device = pts_rect.device
+        R0 = torch.tensor(self.R0,device=device)
+        R0_inv = torch.inverse(R0)
+        pts_ref = torch.mm(pts_rect, R0_inv.T)  # Using torch.mm for matrix multiplication
+
+        # Convert Cartesian to homogeneous coordinates
+        pts_ref_hom = calib.cart_to_hom_gpu(pts_ref)  # Assuming cart_to_hom is adapted for Tensors
+
+        # Dot product to transform to LiDAR coordinates
+        C2V = torch.tensor(calib.C2V,device=device)
+        lidar_coords = torch.mm(pts_ref_hom, C2V.T)
+
+        return lidar_coords
 
     def rect_to_img(self, pts_rect):
         """
@@ -220,9 +242,14 @@ class Calibration(object):
         :param depth_rect: (N)
         :return:
         """
+        device = u.device
         x = ((u - self.cu) * depth_rect) / self.fu + self.tx
+        x = torch.tensor(x, device=device)
         y = ((v - self.cv) * depth_rect) / self.fv + self.ty
-        pts_rect = torch.stack((x, y, depth_rect), dim=1)
+        y = torch.tensor(y, device=device)
+        pts_rect = torch.stack(
+            (torch.reshape(x, (-1, 1)), torch.reshape(y, (-1, 1)), torch.reshape(depth_rect, (-1, 1))),
+            dim=1)
         return pts_rect
 
     def depthmap_to_rect(self, depth_map):
@@ -309,32 +336,33 @@ class Calibration(object):
 
         return alpha
 
-    def flip(self,img_size):
+    def flip(self, img_size):
         wsize = 4
         hsize = 2
-        p2ds = (np.concatenate([np.expand_dims(np.tile(np.expand_dims(np.linspace(0,img_size[0],wsize),0),[hsize,1]),-1),\
-                                np.expand_dims(np.tile(np.expand_dims(np.linspace(0,img_size[1],hsize),1),[1,wsize]),-1),
-                                np.linspace(2,78,wsize*hsize).reshape(hsize,wsize,1)],-1)).reshape(-1,3)
-        p3ds = self.img_to_rect(p2ds[:,0:1],p2ds[:,1:2],p2ds[:,2:3])
-        p3ds[:,0]*=-1
-        p2ds[:,0] = img_size[0] - p2ds[:,0]
+        p2ds = (np.concatenate(
+            [np.expand_dims(np.tile(np.expand_dims(np.linspace(0, img_size[0], wsize), 0), [hsize, 1]), -1), \
+             np.expand_dims(np.tile(np.expand_dims(np.linspace(0, img_size[1], hsize), 1), [1, wsize]), -1),
+             np.linspace(2, 78, wsize * hsize).reshape(hsize, wsize, 1)], -1)).reshape(-1, 3)
+        p3ds = self.img_to_rect(p2ds[:, 0:1], p2ds[:, 1:2], p2ds[:, 2:3])
+        p3ds[:, 0] *= -1
+        p2ds[:, 0] = img_size[0] - p2ds[:, 0]
 
-        #self.P2[0,3] *= -1
-        cos_matrix = np.zeros([wsize*hsize,2,7])
-        cos_matrix[:,0,0] = p3ds[:,0]
-        cos_matrix[:,0,1] = cos_matrix[:,1,2] = p3ds[:,2]
-        cos_matrix[:,1,0] = p3ds[:,1]
-        cos_matrix[:,0,3] = cos_matrix[:,1,4] = 1
-        cos_matrix[:,:,-2] = -p2ds[:,:2]
-        cos_matrix[:,:,-1] = (-p2ds[:,:2]*p3ds[:,2:3])
-        new_calib = np.linalg.svd(cos_matrix.reshape(-1,7))[-1][-1]
+        # self.P2[0,3] *= -1
+        cos_matrix = np.zeros([wsize * hsize, 2, 7])
+        cos_matrix[:, 0, 0] = p3ds[:, 0]
+        cos_matrix[:, 0, 1] = cos_matrix[:, 1, 2] = p3ds[:, 2]
+        cos_matrix[:, 1, 0] = p3ds[:, 1]
+        cos_matrix[:, 0, 3] = cos_matrix[:, 1, 4] = 1
+        cos_matrix[:, :, -2] = -p2ds[:, :2]
+        cos_matrix[:, :, -1] = (-p2ds[:, :2] * p3ds[:, 2:3])
+        new_calib = np.linalg.svd(cos_matrix.reshape(-1, 7))[-1][-1]
         new_calib /= new_calib[-1]
 
-        new_calib_matrix = np.zeros([4,3]).astype(np.float32)
-        new_calib_matrix[0,0] = new_calib_matrix[1,1] = new_calib[0]
-        new_calib_matrix[2,0:2] = new_calib[1:3]
-        new_calib_matrix[3,:] = new_calib[3:6]
-        new_calib_matrix[-1,-1] = self.P2[-1,-1]
+        new_calib_matrix = np.zeros([4, 3]).astype(np.float32)
+        new_calib_matrix[0, 0] = new_calib_matrix[1, 1] = new_calib[0]
+        new_calib_matrix[2, 0:2] = new_calib[1:3]
+        new_calib_matrix[3, :] = new_calib[3:6]
+        new_calib_matrix[-1, -1] = self.P2[-1, -1]
         self.P2 = new_calib_matrix.T
         self.cu = self.P2[0, 2]
         self.cv = self.P2[1, 2]
@@ -342,6 +370,7 @@ class Calibration(object):
         self.fv = self.P2[1, 1]
         self.tx = self.P2[0, 3] / (-self.fu)
         self.ty = self.P2[1, 3] / (-self.fv)
+
 
 ###################  affine trainsform  ###################
 
@@ -405,6 +434,7 @@ def affine_transform(pt, t):
 
 if __name__ == '__main__':
     from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
+
     cfg = {'root_dir': '../../../data'}
     dataset = KITTI_Dataset('train', cfg)
 
@@ -416,14 +446,15 @@ if __name__ == '__main__':
     for object in objects:
         print(object.to_kitti_format())
         object.pos[0] *= 1
-        center_3d = object.pos + [0, -object.h/2, 0]   # real 3D center
-        center_3d = center_3d.reshape(-1, 3)   #(N, 3)
+        center_3d = object.pos + [0, -object.h / 2, 0]  # real 3D center
+        center_3d = center_3d.reshape(-1, 3)  # (N, 3)
         center_3d_projected, depth = calib.rect_to_img(center_3d)
         box2d = object.box2d
-        center_2d = [(box2d[0]+box2d[2])/2, (box2d[1]+box2d[3])/2]
-        print ('3D center/2D center/projected 3D center:', center_3d, center_2d, center_3d_projected)
+        center_2d = [(box2d[0] + box2d[2]) / 2, (box2d[1] + box2d[3]) / 2]
+        print('3D center/2D center/projected 3D center:', center_3d, center_2d, center_3d_projected)
         print('alpha ---> ry ', object.alpha, calib.alpha2ry(object.alpha, center_2d[0]))
         break
+
 
 def load_velo_scan(velo_filename, dtype=np.float32, n_vec=4):
     scan = np.fromfile(velo_filename, dtype=dtype)

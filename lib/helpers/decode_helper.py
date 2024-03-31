@@ -6,6 +6,10 @@ from utils import box_ops
 
 import torch
 
+
+
+
+
 def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
     '''
     NOTE: THIS IS A TENSOR FUNCTION
@@ -16,6 +20,9 @@ def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
     cls_scores = {}
     depth_score = {}
     scores = {}
+    if len(info['img_size'].shape) != 2:
+        info['img_size'] = info['img_size'].unsqueeze(0)
+        info['img_id'] = info['img_id'].unsqueeze(0)
     for i in range(dets.shape[0]):  # batch
         preds = []
         cls_scores_list = []
@@ -36,7 +43,7 @@ def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
 
             # 3d bboxs decoding
             depth = dets[i, j, 6]
-
+            aaa = dets[i, j, 31:34]
             # dimensions decoding
             dimensions = dets[i, j, 31:34] + cls_mean_size[cls_id]
 
@@ -51,7 +58,8 @@ def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
             ry = calibs[i].alpha2ry(alpha, x)
 
             score = cls_score * dets[i, j, -1]
-            pred = torch.cat([torch.tensor([cls_id, alpha], device=dets.device), bbox, dimensions, locations, torch.tensor([ry, score], device=dets.device)])
+            pred = torch.cat([torch.tensor([cls_id, alpha], device=dets.device), bbox, dimensions, locations,
+                              torch.tensor([ry, score], device=dets.device)])
             preds.append(pred)
             cls_scores_list.append(cls_score)
             depth_score_list.append(dets[i, j, -1])

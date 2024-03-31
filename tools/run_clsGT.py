@@ -158,13 +158,13 @@ def main():
         print("number of total images:", len(subset))
         return
     # build dataloader
-    train_set, test_loader, sampler = build_dataloader(cfg['dataset'])
+    train_set, test_loader, sampler, unlabeled_set = build_dataloader(cfg['dataset'])
     if cfg['dataset']["train_split"] in ["semi", 'semi_eigen_clean', 'semi_raw_mix']:
         if checkpoint is not None:
             model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"],
-                                       init_cfg=dict(type='Pretrained', checkpoint=checkpoint))
+                                       init_cfg=dict(type='Pretrained', checkpoint=checkpoint), unlabeled_set=unlabeled_set)
         else:
-            model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"])
+            model = SemiBase3DDetector(cfg, cfg['model'], test_loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"], unlabeled_set=unlabeled_set)
         custom_hooks = [
             dict(type="MeanTeacherHook", momentum=cfg["mean_teacher_hook"]["momentum"],
                  interval=cfg["mean_teacher_hook"]["interval"], skip_buffer=cfg["mean_teacher_hook"]["skip_buffer"])
