@@ -7,6 +7,8 @@ import torch.nn as nn
 from torch import Tensor
 from torchvision.transforms import ToPILImage
 import numpy as np
+
+from tools.clip_kitti import Clip_Kitti
 from .misc import (filter_gt_instances, rename_loss_dict,
                    reweight_loss_dict)
 # from mmdet3d.registry import MODELS
@@ -96,6 +98,7 @@ class SemiBase3DDetector(BaseModel):
         self.depth_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
                                     loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
                                     activated=False)
+        self.teacher.clip_kitti = Clip_Kitti()
 
     def forward(self, inputs, calibs, targets, info, mode):
         """The unified entry for a forward process in both training and test.

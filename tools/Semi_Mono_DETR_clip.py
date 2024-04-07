@@ -6,7 +6,7 @@ import numpy as np
 from uncertainty_estimator import UncertaintyEstimator
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
-
+from torchvision.transforms import ToPILImage
 
 def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
 
@@ -19,8 +19,6 @@ def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
         angle = torch.where(angle > torch.pi, angle - 2 * torch.pi, angle)
 
     return angle
-
-
 
 def alpha2ry_gpu(calib, alpha, u):
     """
@@ -48,6 +46,24 @@ def alpha2ry_gpu(calib, alpha, u):
 
     return ry
 
+def crop(input, bbox2d):
+    bbox2d[0] = bbox2d[0] * 1280
+    bbox2d[1] = bbox2d[1] * 384
+    bbox2d[2] = bbox2d[2] * 1280
+    bbox2d[3] = bbox2d[3] * 384
+    x = bbox2d[0]
+    y = bbox2d[1]
+    w = bbox2d[2]
+    h = bbox2d[3]
+    corner_2d = [x - w / 2, y - h / 2, x + w / 2, y + h / 2]
+    corner_2d = torch.stack(corner_2d)
+    x1 = torch.round(corner_2d[0]).int()
+    y1 = torch.round(corner_2d[1]).int()
+    x2 = torch.round(corner_2d[2]).int()
+    y2 = torch.round(corner_2d[3]).int()
+    input_croped = input[:,y1:y2, x1:x2]
+    return input_croped
+    
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader, inference_set=None, unlabeled_set=None):
         super().__init__()
@@ -158,7 +174,8 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_depth_score_thr",
                                                                                                     0, ),
-                                                                                                batch_targets=targets)
+                                                                                                batch_targets=targets,
+                                                                                                batch_inputs=inputs)
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"][
@@ -184,7 +201,9 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                 self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_depth_score_thr",
-                                                                                                    0)
+                                                                                                    0),
+                                                                                                batch_targets=targets,
+                                                                                                batch_inputs=inputs
                                                                                                 )
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                     dets, calibs, dets.shape[0],
@@ -273,7 +292,7 @@ class Semi_Mono_DETR(BaseModel):
         return targets_list
 
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
-                                depth_score_thr,batch_targets=None):
+                                depth_score_thr,batch_targets=None,batch_inputs=None):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
@@ -290,8 +309,22 @@ class Semi_Mono_DETR(BaseModel):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
                 if dets[i, 1] > cls_pseudo_thr :
-                    #如果初筛通过,将2dbbox对应的图片区域裁剪下来送入clip模型精筛,若为正样本则保留,否则舍弃
-                    mask_cls_pseudo_thr[i] = True
+                    if batch_inputs is not None:
+                        #如果初筛通过,将2dbbox对应的图片区域裁剪下来送入clip模型精筛,若为正样本则保留,否则舍弃
+                        boxes = dets[i, 2:6].to(torch.float32)
+                        img = batch_inputs[bz]
+                        img_croped = crop(img, boxes)
+                        croped_image=img_croped.cpu().numpy().transpose(1, 2, 0)
+                        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                        croped_image = (croped_image * std + mean) * 255.0
+                        croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
+                        # croped_image.save("croped_image.jpg")
+                        probs, pred = self.clip_kitti.predict(croped_image)
+                        if int(pred)==pseudo_labels[i]:
+                            mask_cls_pseudo_thr[i] = True
+                    else:
+                        mask_cls_pseudo_thr[i] = True
                 score = dets[i, 1] * dets[i, -1]
                 if score > score_pseudo_thr :
                     mask_score_pseudo_thr[i] = True
