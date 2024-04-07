@@ -79,7 +79,7 @@ class SemiBase3DDetector(BaseModel):
         # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
         # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
         #加载自己预训练的权重
-        check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
+        check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
         ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
         student_model.load_state_dict(ckpt)
         teacher_model.load_state_dict(ckpt)
@@ -194,6 +194,7 @@ class SemiBase3DDetector(BaseModel):
         cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
             regression_mask, regression_cls_score, regression_topk_boxes    = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
+        
         #输入可视化
         # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
         # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
@@ -306,9 +307,6 @@ class SemiBase3DDetector(BaseModel):
         # consistency_loss = self.consistency_loss(self.student.model.hs,self.teacher.model.hs,mask,cls_score,topk_boxes,self.student.loss.indices)
         # 不加一致性损失
         if mode=="cls":
-            # cls_consistency_loss=self.cls_consistency_loss(\
-            #     self.student.model.pred_logits,self.teacher.model.pred_logits,self.student.loss.indices)
-            # losses.update({"loss_ce": cls_consistency_loss})
             consistency_loss = torch.tensor(0.).to(self.student.model.hs.device)
         # 与教师模型最后一层的输出计算一致性损失
         # consistency_loss = self.consistency_loss(self.student.model.hs[[2]], self.teacher.model.hs[[2]], mask,

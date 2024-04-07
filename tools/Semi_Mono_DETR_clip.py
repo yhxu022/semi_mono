@@ -279,7 +279,8 @@ class Semi_Mono_DETR(BaseModel):
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
             dets = batch_dets[bz]
-            #target = {key: val[bz] for key, val in batch_targets.items()}
+            calib = batch_calibs[bz]
+            # target=batch_targets[bz]
             pseudo_labels = dets[:, 0]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
@@ -289,6 +290,7 @@ class Semi_Mono_DETR(BaseModel):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
                 if dets[i, 1] > cls_pseudo_thr :
+                    #如果初筛通过,将2dbbox对应的图片区域裁剪下来送入clip模型精筛,若为正样本则保留,否则舍弃
                     mask_cls_pseudo_thr[i] = True
                 score = dets[i, 1] * dets[i, -1]
                 if score > score_pseudo_thr :
@@ -298,7 +300,6 @@ class Semi_Mono_DETR(BaseModel):
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
-            calib = calibs[0]
             pseudo_target_dict = {}
             pseudo_labels = dets[:, 0].to(torch.int8)
             pseudo_target_dict["labels"] = pseudo_labels
