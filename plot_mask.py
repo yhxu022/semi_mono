@@ -261,9 +261,9 @@ def plot(jsonfile):
     plt.figure(4)
     plt.plot(train_iter, lr, label='learning rate')
     plt.xlabel('train_iter')
-    plt.ylabel('car_moderate')
+    plt.ylabel('learning_rate')
     plt.legend()
-    plt.savefig(os.path.join(savedir,'learning rate.png'), dpi=1000)
+    plt.savefig(os.path.join(savedir,'learning_rate.png'), dpi=1000)
     plt.figure(5)
     plt.plot(step, teacher_Car_3d_easy_R40, label='teacher_Car_3d_easy_R40')
     plt.plot(step, teacher_Car_3d_moderate_R40, label='teacher_Car_3d_moderate_R40')
@@ -400,8 +400,5 @@ def plot(jsonfile):
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
     plot(
-        "/home/xyh/MonoDETR_semi_baseline_33/outputs/monodetr_2stages_30pc@033100_00/20240331_000013/vis_data/20240331_000013.json"
-
-
-
+        "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_2stages_30pc@040719/20240407_191952/vis_data/20240407_191952.json"
     )

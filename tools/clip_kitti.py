@@ -20,11 +20,11 @@ def zeroshot_classifier(classnames, templates):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load('ViT-L/14@336px', device=device)
 
-kitti_classes = ["Car", "Pedestrian", "Cyclist","Van","Truck","Person_sitting","Tram","Misc","Backgournd"]
+kitti_classes = ["Car", "Pedestrian", "Cyclist","Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
 kitti_templates = ["This is a photo of a {}."]
 print(f"{len(kitti_classes)} classes, {len(kitti_templates)} templates")
 zeroshot_weights = zeroshot_classifier(kitti_classes, kitti_templates)
-image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/007469.png")).unsqueeze(0).to(device)
+image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/000043.png")).unsqueeze(0).to(device)
 
 with torch.no_grad():
     image_features = model.encode_image(image)
