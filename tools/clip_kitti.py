@@ -24,18 +24,15 @@ kitti_classes = ["Car", "Pedestrian", "Cyclist","Van","Truck","Person_sitting","
 kitti_templates = ["This is a photo of a {}."]
 print(f"{len(kitti_classes)} classes, {len(kitti_templates)} templates")
 zeroshot_weights = zeroshot_classifier(kitti_classes, kitti_templates)
-image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/000008.png")).unsqueeze(0).to(device)
-text = clip.tokenize(["a diagram","a car","a dog", "a cat"]).to(device)
+image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/007469.png")).unsqueeze(0).to(device)
 
 with torch.no_grad():
     image_features = model.encode_image(image)
-    text_features = model.encode_text(text)
-    logits_per_image, logits_per_text = model(image, text)
-    probs = logits_per_image.softmax(dim=-1).cpu().numpy()
     # predict
     image_features /= image_features.norm(dim=-1, keepdim=True)
     logits = 100. * image_features @ zeroshot_weights
-    pred = logits.topk(max(topk=(1,)), 1, True, True)[1].t()
+    probs = logits.softmax(dim=-1).cpu().numpy()
+    print("Label probs:", probs)  
+    pred = logits.topk(max((1,)), 1, True, True)[1].t()
     print("Predictions:", pred)  
 
-print("Label probs:", probs)  # prints: [[0.9927937  0.00421068 0.00299572]]
