@@ -15,7 +15,7 @@ from mmengine import MessageHub
 from mmengine.model import BaseModel
 # from mmdet3d.models import Base3DDetector
 from lib.helpers.model_helper import build_model
-from tools.Semi_Mono_DETR_mask import Semi_Mono_DETR
+from tools.Semi_Mono_DETR_clip import Semi_Mono_DETR
 # from mmdet.models.losses.gfocal_loss import QualityFocalLoss
 from lib.losses.gfocal_loss import QualityFocalLoss
 
@@ -69,7 +69,8 @@ class SemiBase3DDetector(BaseModel):
                  semi_train_cfg=None,
                  semi_test_cfg=None,
                  init_cfg=None,
-                 inference_set=None) -> None:
+                 inference_set=None,
+                 unlabeled_set=None) -> None:
         super().__init__(data_preprocessor=None, init_cfg=init_cfg)
         # build model
         student_model, student_loss = build_model(model_cfg)
@@ -77,12 +78,12 @@ class SemiBase3DDetector(BaseModel):
         #支持加载MonoDETR官方训练权重
         # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
         # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
-        check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
+        check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
         ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
         student_model.load_state_dict(ckpt)
         teacher_model.load_state_dict(ckpt)
-        self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
-        self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
+        self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set, unlabeled_set)
+        self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set, unlabeled_set)
         self.semi_train_cfg = semi_train_cfg
         self.semi_test_cfg = semi_test_cfg
         self.sup_size = semi_train_cfg["sup_size"]
@@ -221,15 +222,15 @@ class SemiBase3DDetector(BaseModel):
         # student_masked_image=ToPILImage()(np.round(student_masked_image).astype(np.uint8))
         # student_masked_image.save("student_masked_image.jpg")
         # 用分类伪标签监督
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
-        # 用回归伪标签监督
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
-        # 用GT监督
-        unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, unsup_gt_targets_list,None, None, None, unsup_info,mode='gt'))
+            masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
+        # 用回归伪标签监督
+        losses.update(**self.loss_by_pseudo_instances(
+            student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
+        # 用GT监督
+        # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
+        # losses.update(**self.loss_by_pseudo_instances(
+        #     student_inputs, unsup_calibs, unsup_gt_targets_list, mask, cls_score, unsup_info))
         if "unsup_loss_depth" not in losses:
             losses["sup_loss_depth"]*=1+self.unsup_weight
             losses["sup_loss_depth_0"]*=1+self.unsup_weight   
@@ -291,8 +292,6 @@ class SemiBase3DDetector(BaseModel):
             # self.student.loss.losses=['boxes','dims', 'angles', 'center']
             self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
-        elif mode == 'gt':
-            self.student.loss.losses = losses = ['labels', 'boxes', 'cardinality', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
             len(pseudo_targets["labels"])
@@ -303,8 +302,6 @@ class SemiBase3DDetector(BaseModel):
             message_hub.update_scalar('train/batch_cls_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
         elif mode=="regression":
             message_hub.update_scalar('train/batch_regression_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
-        elif mode=="gt":
-            message_hub.update_scalar('train/batch_gt_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
         if unsupweight_from_hook is None:
             self.unsup_weight = self.semi_train_cfg.get(
                 'unsup_weight', 1.) 
@@ -331,13 +328,13 @@ class SemiBase3DDetector(BaseModel):
             # losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        # for name, loss in unsup_loss_dict.items():
+        for name, loss in unsup_loss_dict.items():
             # 所有unsup深度loss置零
             # if 'loss_depth' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             # unsup深度loss置零,保留depth_map loss
-            # if 'loss_depth' in name and "loss_depth_map" not in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
+            if 'loss_depth' in name and "loss_depth_map" not in name:
+                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
             #将unsup分类损失和中心点损失置零
             # if 'loss_ce' in name:
             #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.

@@ -133,7 +133,7 @@ lr_scheduler:
   decay_rate: 0.1
 
   # if "in_proportion" is False:
-#  decay_list: [4160, 5500]
+  # decay_list: [4160, 5500]
   decay_list: [5000, 6500, 15000]
 
 trainer:
