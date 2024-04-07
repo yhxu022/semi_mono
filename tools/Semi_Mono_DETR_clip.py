@@ -159,7 +159,6 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_depth_score_thr",
                                                                                                     0, ),
                                                                                                 batch_targets=targets)
-
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"][
@@ -168,32 +167,7 @@ class Semi_Mono_DETR(BaseModel):
                         "regression_score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0, ),
                     batch_targets=targets)
-
-                mask_pseudo_targets_list, mask_mask, mask_cls_score = self.get_pseudo_targets_list(dets, calibs,
-                                                                                                   dets.shape[0],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_cls_pseudo_floor"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_score_pseudo_floor"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"].get(
-                                                                                                       "mask_depth_score_floor",
-                                                                                                       0),
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_cls_pseudo_ceiling"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_score_pseudo_ceiling"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"].get(
-                                                                                                       "mask_depth_score_ceiling",
-                                                                                                       0),
-                                                                                                   batch_targets=targets)
-
-                mask_topk_boxes = cls_topk_boxes = regression_topk_boxes = topk_boxes
+                cls_topk_boxes = regression_topk_boxes = topk_boxes
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -220,34 +194,10 @@ class Semi_Mono_DETR(BaseModel):
                         "regression_score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0)
                     )
-                mask_pseudo_targets_list, mask_mask, mask_cls_score = self.get_pseudo_targets_list(dets, calibs,
-                                                                                                   dets.shape[0],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_cls_pseudo_floor"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_score_pseudo_floor"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"].get(
-                                                                                                       "mask_depth_score_floor",
-                                                                                                       0),
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_cls_pseudo_ceiling"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"][
-                                                                                                       "mask_score_pseudo_ceiling"],
-                                                                                                   self.cfg[
-                                                                                                       "semi_train_cfg"].get(
-                                                                                                       "mask_depth_score_ceiling",
-                                                                                                       0)
-                                                                                                   )
-                mask_topk_boxes = cls_topk_boxes = regression_topk_boxes = topk_boxes
+                cls_topk_boxes = regression_topk_boxes = topk_boxes
 
             return cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list, \
-                regression_mask, regression_cls_score, regression_topk_boxes, \
-                mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes
+                regression_mask, regression_cls_score, regression_topk_boxes
         elif mode == 'inference':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
@@ -323,15 +273,13 @@ class Semi_Mono_DETR(BaseModel):
         return targets_list
 
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
-                                depth_score_thr,
-                                cls_pseudo_thr_ceiling=10000, score_pseudo_thr_ceiling=10000,
-                                depth_score_thr_ceiling=10000, batch_targets=None):
+                                depth_score_thr,batch_targets=None):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
         for bz in range(batch_size):
             dets = batch_dets[bz]
-            target = {key: val[bz] for key, val in batch_targets.items()}
+            #target = {key: val[bz] for key, val in batch_targets.items()}
             pseudo_labels = dets[:, 0]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
@@ -340,83 +288,17 @@ class Semi_Mono_DETR(BaseModel):
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
-                if dets[i, 1] > cls_pseudo_thr and dets[i, 1] < cls_pseudo_thr_ceiling:
+                if dets[i, 1] > cls_pseudo_thr :
                     mask_cls_pseudo_thr[i] = True
                 score = dets[i, 1] * dets[i, -1]
-                if score > score_pseudo_thr and score < score_pseudo_thr_ceiling:
+                if score > score_pseudo_thr :
                     mask_score_pseudo_thr[i] = True
-                if dets[i, -1] > depth_score_thr and dets[i, -1] < depth_score_thr_ceiling:
+                if dets[i, -1] > depth_score_thr :
                     mask_depth_score_pseudo_thr[i] = True
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             mask_list.append(mask)
             dets = dets[mask]
-
-
-            # 把target和伪标签做iou，使得分类一定正确
-            device = dets.device
-            dets = dets.unsqueeze(0)
-            # calibs = target['calibs']
-            calibs = [self.unlabeled_set.get_calib(index) for index in target['img_id'].unsqueeze(0)]
-            mask_cls_gt = np.zeros((len(dets[:, 0])), dtype=bool)
-            cls_mean_size = torch.zeros((3, 3), device=device)
-            dets_decode, cls_scores, depth_score_list, scores = decode_detections_GPU(
-                dets=dets,
-                info=target,
-                calibs=calibs,
-                cls_mean_size=cls_mean_size,
-                threshold=self.cfg["tester"].get('threshold', 0.2))
-
-            dets_img = dets_decode[int(target['img_id'])]
             calib = calibs[0]
-            if len(dets_img) >= 1:
-                device = dets_img.device
-                dets_img = torch.tensor(dets_img, dtype=torch.float32).to(device)
-                loc = dets_img[:, 9:12]
-                h = dets_img[:, 6:7]
-                w = dets_img[:, 7:8]
-                l = dets_img[:, 8:9]
-                ry = dets_img[:, 12:13]
-                loc_lidar = calib.rect_to_lidar_gpu(loc)
-                loc_lidar[:, 2] += h[:, 0] / 2
-                heading = -(torch.pi / 2 + ry)
-                boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
-
-                hwl = target["src_size_3d"]
-                h_gt = hwl[0]
-                w_gt = hwl[1]
-                l_gt = hwl[2]
-                x_3d_gt = target['boxes_3d'][0] * 1280
-                y_3d_gt = target['boxes_3d'][1] * 384
-                z_3d_gt = target['depth']
-                alpha_gt = class2angle_gpu(cls=target['heading_bin'],residual=target['heading_res'])
-                x_gt = target['boxes'][0]
-                ry_gt = alpha2ry_gpu(calibs, alpha_gt, x_gt)
-                loc_gt = torch.stack([x_3d_gt, y_3d_gt, z_3d_gt], dim=0).to(device)
-                loc_lidar_gt = calib.rect_to_lidar_gpu(loc_gt)
-                loc_lidar_gt[:, 2] += h_gt[:, 0] / 2
-                heading_gt = -(torch.pi / 2 + ry_gt)
-                boxes_lidar_gt = torch.concatenate([loc_lidar_gt, l_gt, w_gt, h_gt, heading_gt], axis=1)
-                pass
-            else:
-                boxes_lidar = None
-                loc = None
-
-            boxes_lidar = boxes_lidar.float()
-            iou3D = boxes_iou3d_gpu(boxes_lidar, boxes_lidar_gt)  # [num_pre, num_gt]
-
-            num_pre = boxes_lidar.shape[0]
-            num_gt = boxes_lidar_gt.shape[0]
-            max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
-            valid_indices = [idx for idx, val in enumerate(max_iou_values) if val > 0]  # [1,2,0]
-            for idx in valid_indices:
-                pred_label = dets[:, 0][idx]
-                gt_label = target['labels'][max_iou_indices[idx]]
-                if pred_label == gt_label:
-                    mask_cls_gt[idx]=True
-
-            dets = dets[mask_cls_gt]
-
-
             pseudo_target_dict = {}
             pseudo_labels = dets[:, 0].to(torch.int8)
             pseudo_target_dict["labels"] = pseudo_labels

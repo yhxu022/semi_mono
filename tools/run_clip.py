@@ -24,7 +24,6 @@ from mmengine.runner import Runner
 from mmengine.logging import MMLogger
 # 用clip辅助分类
 from tools.semi_base3d_clip import SemiBase3DDetector
-# from tools.semi_base3d import SemiBase3DDetector
 from tools.Mono_DETR import Mono_DETR
 from lib.helpers.model_helper import build_model
 from tools.hook.mean_teacher_hook import MeanTeacherHook

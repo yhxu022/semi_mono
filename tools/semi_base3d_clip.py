@@ -78,6 +78,7 @@ class SemiBase3DDetector(BaseModel):
         #支持加载MonoDETR官方训练权重
         # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
         # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
+        #加载自己预训练的权重
         check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
         ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
         student_model.load_state_dict(ckpt)
@@ -94,9 +95,6 @@ class SemiBase3DDetector(BaseModel):
             self.freeze(self.teacher)
         self.depth_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
                                     loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
-                                    activated=False)
-        self.cls_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
-                                    loss_weight=self.semi_train_cfg.get('cls_consistency_loss_weight', 1.),\
                                     activated=False)
 
     def forward(self, inputs, calibs, targets, info, mode):
@@ -194,16 +192,8 @@ class SemiBase3DDetector(BaseModel):
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
         #获得用于分类训练的伪标签、用于回归训练的伪标签和要mask的伪标签
         cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
-            regression_mask, regression_cls_score, regression_topk_boxes,\
-            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes= self.get_pseudo_targets(
+            regression_mask, regression_cls_score, regression_topk_boxes    = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
-        masked_pseudo_instances_num = sum([
-            len(pseudo_targets["labels"])
-            for pseudo_targets in mask_pseudo_targets_list
-        ])
-        message_hub.update_scalar('train/batch_masked_pseudo_instances_num', masked_pseudo_instances_num)
-        #将student的输入mask掉容易造成歧义的对象
-        masked_inputs = self.mask_input_for_student(student_inputs, mask_pseudo_targets_list, info)
         #输入可视化
         # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
         # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
@@ -223,7 +213,7 @@ class SemiBase3DDetector(BaseModel):
         # student_masked_image.save("student_masked_image.jpg")
         # 用分类伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
-            masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
+            student_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
         # 用回归伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
             student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
@@ -285,12 +275,15 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
         if mode=="cls":
-            self.student.loss.losses=['labels']
+            #2d属性损失
+            self.student.loss.losses=['labels','boxes', 'center']
+            # self.student.loss.losses=['labels']
             # self.student.loss.losses=[]
         elif mode=="regression":
+            #3d属性损失
             #self.student.loss.losses=['boxes',  'dims', 'angles']
             # self.student.loss.losses=['boxes','dims', 'angles', 'center']
-            self.student.loss.losses=['boxes','dims', 'angles', 'center', 'depth_map']
+            self.student.loss.losses=['dims', 'angles', 'depth_map']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
@@ -328,19 +321,6 @@ class SemiBase3DDetector(BaseModel):
             # losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
-        for name, loss in unsup_loss_dict.items():
-            # 所有unsup深度loss置零
-            # if 'loss_depth' in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            # unsup深度loss置零,保留depth_map loss
-            if 'loss_depth' in name and "loss_depth_map" not in name:
-                unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            #将unsup分类损失和中心点损失置零
-            # if 'loss_ce' in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
-            #将unsup分类损失置零
-            # if 'loss_ce' in name and 'loss_center' not in name:
-            #     unsup_loss_dict[name] = unsup_loss_dict[name] * 0.
         return unsup_loss_dict
     
     def depth_map_consistency_loss(self,
@@ -352,28 +332,6 @@ class SemiBase3DDetector(BaseModel):
         target=(max_index, max_value)
         depth_map_consistency_loss=self.depth_qfl(student_depth_map_logits,target)
         return depth_map_consistency_loss
-    
-    def query_consistency_loss(self,
-                         student_pred_logits,
-                         teacher_pred_logits,
-                         indices):
-        teacher_pred=teacher_pred_logits.sigmoid()
-        # 保留最大值并将其余位置置零
-        max_value, max_index = torch.max(torch.flatten(teacher_pred, start_dim=0, end_dim=1), dim=-1)
-        target=(max_index, max_value)
-        cls_consistency_loss=self.cls_qfl(torch.flatten(student_pred_logits, start_dim=0, end_dim=1),target)
-        return cls_consistency_loss
-    
-    def cls_consistency_loss(self,
-                         student_pred_logits,
-                         teacher_pred_logits,
-                         indices):
-        teacher_pred=teacher_pred_logits.sigmoid()
-        # 保留最大值并将其余位置置零
-        max_value, max_index = torch.max(torch.flatten(teacher_pred, start_dim=0, end_dim=1), dim=-1)
-        target=(max_index, max_value)
-        cls_consistency_loss=self.cls_qfl(torch.flatten(student_pred_logits, start_dim=0, end_dim=1),target)
-        return cls_consistency_loss
     
     def consistency_loss(self,
                          student_decoder_outputs,
@@ -421,12 +379,10 @@ class SemiBase3DDetector(BaseModel):
         """Get pseudo targets from teacher model."""
         self.teacher.eval()
         cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
-            regression_mask, regression_cls_score, regression_topk_boxes,\
-            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes= self.teacher.forward(
+            regression_mask, regression_cls_score, regression_topk_boxes = self.teacher.forward(
             unsup_inputs, unsup_calibs, unsup_targets, unsup_info, mode='get_pseudo_targets')
         return cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
-            regression_mask, regression_cls_score, regression_topk_boxes,\
-            mask_pseudo_targets_list, mask_mask, mask_cls_score, mask_topk_boxes
+            regression_mask, regression_cls_score, regression_topk_boxes
 
     def project_pseudo_instances(self, batch_pseudo_instances,
                                  batch_data_samples):
