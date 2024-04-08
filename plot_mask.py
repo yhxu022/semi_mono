@@ -226,7 +226,8 @@ def plot(jsonfile):
                 student_Car_image_hard_R40.append(new_data["student/Car_image_hard_R40"])
     plt.figure(1)
     plt.plot(train_iter, batch_unsup_gt_instances_num, label='batch_unsup_gt_instances_num')
-    plt.plot(train_iter, batch_masked_pseudo_instances_num, label="batch_masked_pseudo_instances_num")
+    if len(batch_masked_pseudo_instances_num) > 0:
+        plt.plot(train_iter, batch_masked_pseudo_instances_num, label="batch_masked_pseudo_instances_num")
     if len(batch_cls_unsup_pseudo_instances_num) > 0:
         plt.plot(train_iter, batch_cls_unsup_pseudo_instances_num, label="batch_cls_unsup_pseudo_instances_num")
     if len(batch_gt_unsup_pseudo_instances_num) > 0 :
@@ -400,5 +401,5 @@ def plot(jsonfile):
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
     plot(
-        "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_2stages_30pc@040719/20240407_191952/vis_data/20240407_191952.json"
+        "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_2stages_30pc_clip@040814/20240408_145529/vis_data/20240408_145529.json"
     )

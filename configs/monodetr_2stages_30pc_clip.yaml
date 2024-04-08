@@ -32,16 +32,16 @@ semi_train_cfg:
   sup_size: 2
   freeze_teacher: True # 冻结教师
   sup_weight: 1 # 监督权重
-  unsup_weight: 1 # 无监督权重
+  unsup_weight: 2 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   depth_map_consistency_loss_weight: 0.0 #深度图一致性损失的权重
   topk: 50
-  cls_cls_pseudo_thr: 0.05 # 用于分类的类pseudobox 阈值
+  cls_cls_pseudo_thr: 0.1 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox阈值
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
   regression_cls_pseudo_thr: 0.1 # 用于回归的类pseudobox 阈值
   regression_score_pseudo_thr: 0 # 用于回归的pseudobox 阈值
-  regression_depth_score_thr: 2.5 # 用于回归的深度分阈值
+  regression_depth_score_thr: 15 # 用于回归的深度分阈值
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:

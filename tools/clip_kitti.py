@@ -4,15 +4,11 @@ from PIL import Image
 from tqdm import tqdm
 
 class Clip_Kitti(object):
-    def __init__(self,device=None):
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = device
-        self.model, self.preprocess = clip.load('ViT-L/14@336px', device=self.device)
+    def __init__(self):
+        self.device = None
         self.kitti_classes = ['Pedestrian', 'Car', 'Cyclist',"Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
         self.kitti_templates = ["This is a photo of a {}."]
         print(f"{len(self.kitti_classes)} classes, {len(self.kitti_templates)} templates")
-        self.zeroshot_weights = self.zeroshot_classifier(self.kitti_classes, self.kitti_templates)
 
     def zeroshot_classifier(self,classnames, templates):
         with torch.no_grad():
@@ -28,7 +24,11 @@ class Clip_Kitti(object):
             zeroshot_weights = torch.stack(zeroshot_weights, dim=1).cuda()
         return zeroshot_weights
 
-    def predict(self, image):
+    def predict(self, image,device=None):
+        if self.device is None:
+            self.device = device
+            self.model, self.preprocess = clip.load('ViT-L/14@336px', device=self.device)
+            self.zeroshot_weights = self.zeroshot_classifier(self.kitti_classes, self.kitti_templates)
         image = self.preprocess(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             image_features = self.model.encode_image(image)

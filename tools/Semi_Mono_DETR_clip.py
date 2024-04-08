@@ -155,7 +155,6 @@ class Semi_Mono_DETR(BaseModel):
                                 dets[int(id)] = dets_img
             return dets, targets
 
-
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
@@ -173,7 +172,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                 self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_depth_score_thr",
-                                                                                                    0, ),
+                                                                                                    0),
                                                                                                 batch_targets=targets,
                                                                                                 batch_inputs=inputs)
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
@@ -182,8 +181,9 @@ class Semi_Mono_DETR(BaseModel):
                         "regression_cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"][
                         "regression_score_pseudo_thr"],
-                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0, ),
-                    batch_targets=targets)
+                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0 ),
+                    batch_targets=targets,
+                    batch_inputs=None)
                 cls_topk_boxes = regression_topk_boxes = topk_boxes
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
@@ -211,8 +211,8 @@ class Semi_Mono_DETR(BaseModel):
                         "regression_cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"][
                         "regression_score_pseudo_thr"],
-                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0)
-                    )
+                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0),
+                    batch_inputs=None)
                 cls_topk_boxes = regression_topk_boxes = topk_boxes
 
             return cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list, \
@@ -299,7 +299,6 @@ class Semi_Mono_DETR(BaseModel):
         for bz in range(batch_size):
             dets = batch_dets[bz]
             calib = batch_calibs[bz]
-            # target=batch_targets[bz]
             pseudo_labels = dets[:, 0]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
@@ -313,16 +312,17 @@ class Semi_Mono_DETR(BaseModel):
                         #如果初筛通过,将2dbbox对应的图片区域裁剪下来送入clip模型精筛,若为正样本则保留,否则舍弃
                         boxes = dets[i, 2:6].to(torch.float32)
                         img = batch_inputs[bz]
-                        img_croped = crop(img, boxes)
-                        croped_image=img_croped.cpu().numpy().transpose(1, 2, 0)
-                        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                        croped_image = (croped_image * std + mean) * 255.0
-                        croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
-                        # croped_image.save("croped_image.jpg")
-                        probs, pred = self.clip_kitti.predict(croped_image)
-                        if int(pred)==pseudo_labels[i]:
-                            mask_cls_pseudo_thr[i] = True
+                        img_croped = crop(img, boxes.clone())
+                        if img_croped.shape[1]>0 and img_croped.shape[2]>0:
+                            croped_image=img_croped.cpu().numpy().transpose(1, 2, 0)
+                            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                            croped_image = (croped_image * std + mean) * 255.0
+                            croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
+                            # croped_image.save("croped_image.jpg")
+                            probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
+                            if int(pred)==pseudo_labels[i]:
+                                mask_cls_pseudo_thr[i] = True
                     else:
                         mask_cls_pseudo_thr[i] = True
                 score = dets[i, 1] * dets[i, -1]

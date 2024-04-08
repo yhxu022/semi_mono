@@ -193,7 +193,7 @@ class SemiBase3DDetector(BaseModel):
         ])
         message_hub = MessageHub.get_current_instance()
         message_hub.update_scalar('train/batch_unsup_gt_instances_num', unsup_gt_instances_num)
-        #获得用于分类训练的伪标签、用于回归训练的伪标签和要mask的伪标签
+        #获得用于分类训练的伪标签和用于回归训练的伪标签
         cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
             regression_mask, regression_cls_score, regression_topk_boxes    = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
@@ -280,14 +280,17 @@ class SemiBase3DDetector(BaseModel):
         """
         if mode=="cls":
             #2d属性损失
-            self.student.loss.losses=['labels','boxes', 'center']
-            # self.student.loss.losses=['labels']
+            # self.student.loss.losses=['labels','boxes', 'center']
+            #分类损失
+            self.student.loss.losses=['labels']
             # self.student.loss.losses=[]
         elif mode=="regression":
             #3d属性损失
             #self.student.loss.losses=['boxes',  'dims', 'angles']
             # self.student.loss.losses=['boxes','dims', 'angles', 'center']
-            self.student.loss.losses=['dims', 'angles', 'depth_map']
+            #self.student.loss.losses=['dims', 'angles', 'depth_map']
+            #回归损失
+            self.student.loss.losses=['boxes', 'dims', 'angles', 'center']
             #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
