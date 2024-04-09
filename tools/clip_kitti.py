@@ -41,5 +41,5 @@ class Clip_Kitti(object):
     
 if __name__ == "__main__":
     clip_kitti = Clip_Kitti()
-    probs, pred = clip_kitti.predict(Image.open("/data/ipad_3d/monocular/semi_mono/000043.png"))
+    probs, pred = clip_kitti.predict(Image.open("000043.png"),device='cuda')
     print(probs, pred)

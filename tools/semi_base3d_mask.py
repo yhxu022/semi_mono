@@ -75,12 +75,12 @@ class SemiBase3DDetector(BaseModel):
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
         #支持加载MonoDETR官方训练权重
-        # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
-        # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")['model_state'])
-        check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
-        ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-        student_model.load_state_dict(ckpt)
-        teacher_model.load_state_dict(ckpt)
+        student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+        teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+        # check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")["state_dict"]
+        # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+        # student_model.load_state_dict(ckpt)
+        # teacher_model.load_state_dict(ckpt)
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set)
         self.teacher = Semi_Mono_DETR(teacher_model, teacher_loss, cfg, test_loader, inference_set)
         self.semi_train_cfg = semi_train_cfg
@@ -221,15 +221,15 @@ class SemiBase3DDetector(BaseModel):
         # student_masked_image=ToPILImage()(np.round(student_masked_image).astype(np.uint8))
         # student_masked_image.save("student_masked_image.jpg")
         # 用分类伪标签监督
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
-        # 用回归伪标签监督
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
-        # 用GT监督
-        unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, unsup_gt_targets_list,None, None, None, unsup_info,mode='gt'))
+            masked_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
+        # 用回归伪标签监督
+        losses.update(**self.loss_by_pseudo_instances(
+            student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
+        # 用GT监督
+        # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
+        # losses.update(**self.loss_by_pseudo_instances(
+        #     student_inputs, unsup_calibs, unsup_gt_targets_list,None, None, None, unsup_info,mode='gt'))
         if "unsup_loss_depth" not in losses:
             losses["sup_loss_depth"]*=1+self.unsup_weight
             losses["sup_loss_depth_0"]*=1+self.unsup_weight   

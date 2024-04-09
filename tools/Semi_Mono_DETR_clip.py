@@ -264,7 +264,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info)
+                    info,batch_inputs=inputs)
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -275,7 +275,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info)
+                    info,batch_inputs=inputs)
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
 
     def prepare_targets(self, targets, batch_size):
@@ -448,7 +448,7 @@ class Semi_Mono_DETR(BaseModel):
         return dets_img
 
     def get_boxes_lidar_and_clsscore(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr,
-                                     score_pseudo_thr, depth_score_thr, info):
+                                     score_pseudo_thr, depth_score_thr, info,batch_inputs=None):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
         depth_score_list = []
@@ -468,7 +468,23 @@ class Semi_Mono_DETR(BaseModel):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
                 if dets[i, 1] > cls_pseudo_thr:
-                    mask_cls_pseudo_thr[i] = True
+                    if batch_inputs is not None:
+                        # 如果初筛通过,将2dbbox对应的图片区域裁剪下来送入clip模型精筛,若为正样本则保留,否则舍弃
+                        boxes = dets[i, 2:6].to(torch.float32)
+                        img = batch_inputs[bz]
+                        img_croped = crop(img, boxes.clone())
+                        if img_croped.shape[1] > 0 and img_croped.shape[2] > 0:
+                            croped_image = img_croped.cpu().numpy().transpose(1, 2, 0)
+                            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+                            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+                            croped_image = (croped_image * std + mean) * 255.0
+                            croped_image = ToPILImage()(np.round(croped_image).astype(np.uint8))
+                            # croped_image.save("croped_image.jpg")
+                            probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
+                            if int(pred) == pseudo_labels[i]:
+                                mask_cls_pseudo_thr[i] = True
+                    else:
+                        mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])
                 score = dets[i, 1] * dets[i, -1]
                 if score > score_pseudo_thr:

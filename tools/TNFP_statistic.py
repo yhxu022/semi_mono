@@ -19,7 +19,10 @@ import argparse
 # import ast
 # import cv2
 # import time
+
+# from tools.semi_base3d_clip import SemiBase3DDetector
 from tools.semi_base3d import SemiBase3DDetector
+
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
@@ -177,13 +180,16 @@ def main():
 
         boxes_lidar = boxes_lidar.float().to('cuda')
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
+        # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
+
         num_pre = boxes_lidar.shape[0]
         num_gt = gt_boxes.shape[0]
         all_preds = all_preds + num_pre
         all_gts = all_gts + num_gt
         # max_iou_per_pred = torch.max(iou3D, dim=1)[0]
         max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
-        # print(f"max_iou_values:{max_iou_values}")
+        # print(f"num_pre: {num_pre}  ;  num_gt: {num_gt}")
+        # print(f"max_iou_values:{max_iou_values.shape}")
         valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]   # [1,2,0]
         filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
         pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
@@ -193,13 +199,14 @@ def main():
 
         # print(f"pseudo_labels_list :{pseudo_labels_list}")
         # print(f"labels_gt :{labels_gt}")
+        idx_selected = []
         for idx in valid_indices:
             pred_label = pseudo_labels_list[idx]
             gt_label = labels_gt[max_iou_indices[idx]]
-            if pred_label == gt_label:
-                all_TP = all_TP + 1
-
-
+            if max_iou_indices[idx] not in idx_selected:
+                if pred_label == gt_label:
+                    all_TP = all_TP + 1
+                    idx_selected.append(max_iou_indices[idx])
 
         all_scores.extend(filtered_scores)
         all_max_ious.extend(filtered_max_ious)
