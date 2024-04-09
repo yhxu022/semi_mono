@@ -174,7 +174,11 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_depth_score_thr",
                                                                                                     0),
                                                                                                 batch_targets=targets,
-                                                                                                batch_inputs=inputs)
+                                                                                                batch_inputs=inputs,
+                                                                                                cls_clip_threshold=self.cfg[
+                                                                                                    "semi_train_cfg"].get(
+                                                                                                    "cls_clip_thr",
+                                                                                                    0.5))
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"][
@@ -203,7 +207,11 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_depth_score_thr",
                                                                                                     0),
                                                                                                 batch_targets=targets,
-                                                                                                batch_inputs=inputs
+                                                                                                batch_inputs=inputs, 
+                                                                                                cls_clip_threshold=self.cfg[
+                                                                                                    "semi_train_cfg"].get(
+                                                                                                    "cls_clip_thr",
+                                                                                                    0.5)
                                                                                                 )
                 regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                     dets, calibs, dets.shape[0],
@@ -292,7 +300,7 @@ class Semi_Mono_DETR(BaseModel):
         return targets_list
 
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
-                                depth_score_thr,batch_targets=None,batch_inputs=None):
+                                depth_score_thr,batch_targets=None,batch_inputs=None,cls_clip_threshold=0.5):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
@@ -321,7 +329,7 @@ class Semi_Mono_DETR(BaseModel):
                             croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
                             # croped_image.save("croped_image.jpg")
                             probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
-                            if int(pred)==pseudo_labels[i]:
+                            if int(pred)==pseudo_labels[i] and probs.max() > cls_clip_threshold:
                                 mask_cls_pseudo_thr[i] = True
                     else:
                         mask_cls_pseudo_thr[i] = True

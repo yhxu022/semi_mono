@@ -223,8 +223,8 @@ class SemiBase3DDetector(BaseModel):
         losses.update(**self.loss_by_pseudo_instances(
             student_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
         # 用回归伪标签监督
-        losses.update(**self.loss_by_pseudo_instances(
-            student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
+        # losses.update(**self.loss_by_pseudo_instances(
+        #     student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
         # 用GT监督
         # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         # losses.update(**self.loss_by_pseudo_instances(
@@ -235,6 +235,30 @@ class SemiBase3DDetector(BaseModel):
             losses["sup_loss_depth_1"]*=1+self.unsup_weight  
         if "unsup_loss_depth_map" not in losses:
             losses["sup_loss_depth_map"]*=1+self.unsup_weight
+        if "unsup_loss_ce" not in losses:
+            losses["sup_loss_ce"]*=1+self.unsup_weight
+            losses["sup_loss_ce_0"]*=1+self.unsup_weight
+            losses["sup_loss_ce_1"]*=1+self.unsup_weight
+        if "unsup_loss_giou" not in losses:
+            losses["sup_loss_giou"]*=1+self.unsup_weight
+            losses["sup_loss_giou_0"]*=1+self.unsup_weight
+            losses["sup_loss_giou_1"]*=1+self.unsup_weight
+        if "unsup_loss_bbox" not in losses:
+            losses["sup_loss_bbox"]*=1+self.unsup_weight
+            losses["sup_loss_bbox_0"]*=1+self.unsup_weight
+            losses["sup_loss_bbox_1"]*=1+self.unsup_weight
+        if "unsup_loss_dim" not in losses:
+            losses["sup_loss_dim"]*=1+self.unsup_weight
+            losses["sup_loss_dim_0"]*=1+self.unsup_weight
+            losses["sup_loss_dim_1"]*=1+self.unsup_weight
+        if "unsup_loss_angle" not in losses:
+            losses["sup_loss_angle"]*=1+self.unsup_weight
+            losses["sup_loss_angle_0"]*=1+self.unsup_weight
+            losses["sup_loss_angle_1"]*=1+self.unsup_weight
+        if "unsup_loss_center" not in losses:
+            losses["sup_loss_center"]*=1+self.unsup_weight
+            losses["sup_loss_center_0"]*=1+self.unsup_weight
+            losses["sup_loss_center_1"]*=1+self.unsup_weight
         return losses
 
     def loss_by_gt_instances(self,
