@@ -462,6 +462,7 @@ class Semi_Mono_DETR(BaseModel):
         depth_score_list = []
         scores_list = []
         pseudo_labels_list = []
+        prob_from_clip = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
             dets = batch_dets[bz]
@@ -489,11 +490,19 @@ class Semi_Mono_DETR(BaseModel):
                             croped_image = ToPILImage()(np.round(croped_image).astype(np.uint8))
                             # croped_image.save("croped_image.jpg")
                             probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
+                            # if int(pred) == pseudo_labels[i] or int(pred) == len(probs[0])-1:
                             if int(pred) == pseudo_labels[i]:
                                 mask_cls_pseudo_thr[i] = True
+                                prob_from_clip.append(probs[0][pred])
+                            else:
+                                if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
+                                    with open(file="your_file_path.txt", mode="a") as f:
+                                        f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
+                                        croped_image.save(f"wrong/{info['img_id'][bz]}_{i}.jpg")
                     else:
                         mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])
+
                 score = dets[i, 1] * dets[i, -1]
                 if score > score_pseudo_thr:
                     mask_score_pseudo_thr[i] = True
@@ -544,9 +553,13 @@ class Semi_Mono_DETR(BaseModel):
                 loc = None
 
         score_list = torch.tensor(score_list)
+        prob_from_clip = torch.tensor(prob_from_clip)
         depth_score_list = torch.tensor(depth_score_list)
         depth_score_list = torch.squeeze(depth_score_list, dim=0)
         scores_list = torch.tensor(scores_list)
         scores_list = torch.squeeze(scores_list, dim=0)
         # pseudo_labels_list = torch.tensor(pseudo_labels_list)
         return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list
+        # return boxes_lidar, score_list, loc, prob_from_clip, scores_list, pseudo_labels_list
+
+    # score_list：分类分    depth_score_list：深度分    scores_list：分类分和深度分相乘

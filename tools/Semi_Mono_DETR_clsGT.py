@@ -17,36 +17,9 @@ def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
     if to_label_format:
         # Using torch.where to handle condition across tensors
         angle = torch.where(angle > torch.pi, angle - 2 * torch.pi, angle)
-
     return angle
 
 
-
-def alpha2ry_gpu(calib, alpha, u):
-    """
-    Convert alpha (observation angle) to rotation_y (rotation around Y-axis in camera coordinates),
-    considering the object center 'u' and camera calibration parameters 'cu' and 'fu'.
-
-    Parameters:
-    alpha (Tensor): Observation angle of object, ranging [-pi..pi]
-    u (Tensor): Object center x to the camera center (x-W/2), in pixels
-
-    Returns:
-    Tensor: rotation_y around Y-axis in camera coordinates [-pi..pi]
-    """
-    # Ensure alpha, u, cu, and fu are on the same device
-    # device = alpha.device
-    calib.cu = calib.cu
-    calib.fu = calib.fu
-
-    # Calculate rotation_y
-    ry = alpha + torch.atan2(u - calib.cu, calib.fu)
-
-    # Adjust rotation_y to be within [-pi, pi]
-    ry = torch.where(ry > torch.pi, ry - 2 * torch.pi, ry)
-    ry = torch.where(ry < -torch.pi, ry + 2 * torch.pi, ry)
-
-    return ry
 
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader, inference_set=None, unlabeled_set=None):
@@ -390,7 +363,7 @@ class Semi_Mono_DETR(BaseModel):
                 z_3d_gt = target['depth']
                 alpha_gt = class2angle_gpu(cls=target['heading_bin'],residual=target['heading_res'])
                 x_gt = target['boxes'][0]
-                ry_gt = alpha2ry_gpu(calibs, alpha_gt, x_gt)
+                ry_gt = calib.alpha2ry_gpu(alpha_gt, x_gt)
                 loc_gt = torch.stack([x_3d_gt, y_3d_gt, z_3d_gt], dim=0).to(device)
                 loc_lidar_gt = calib.rect_to_lidar_gpu(loc_gt)
                 loc_lidar_gt[:, 2] += h_gt[:, 0] / 2

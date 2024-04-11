@@ -32,7 +32,7 @@ semi_train_cfg:
   sup_size: 2
   freeze_teacher: True # 冻结教师
   sup_weight: 1 # 监督权重
-  unsup_weight: 0.2 # 无监督权重
+  unsup_weight: 0.1 # 无监督权重
   consistency_weight: 0 #一致性损失的权重
   depth_map_consistency_loss_weight: 0.0 #深度图一致性损失的权重
   topk: 50
@@ -45,7 +45,8 @@ semi_train_cfg:
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:
-  momentum: 0.0004
+#  momentum: 0.0004
+  momentum: 0.001
   interval: 1
   skip_buffer: True
 
@@ -120,7 +121,7 @@ optimizer:
 lr_scheduler:
   type: 'step'  # 'step' or 'cos'   'cos'默认有warmup
 
-  # when type is 'step' and one-stage:
+  # when type is 'step' and two-stage:
   warmup: True
   warmup_steps: 1000
   in_proportion: False # 按比率设置decay_list
@@ -132,7 +133,7 @@ lr_scheduler:
   decay_list: [29000, 38280]
 
 trainer:
-  max_iteration: 25000
+  max_iteration: 45240
   val_begin: 0
   val_iterval: 232
   # save_interval: 22620 # checkpoint save interval (in iteration)

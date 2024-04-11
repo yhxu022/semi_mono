@@ -6,7 +6,10 @@ from tqdm import tqdm
 class Clip_Kitti(object):
     def __init__(self):
         self.device = None
-        self.kitti_classes = ['Pedestrian', 'Car', 'Cyclist',"Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
+        # self.kitti_classes = ['Pedestrian', 'Car', 'Cyclist',"Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
+                              # "Black Car","Black Van","Black Truck","Gray Car","Gray Van","Gray Truck", "SUV"]
+        # self.kitti_classes = ["Background",'Car', 'Cyclist',"Van","Truck","asphalt road","road","tree","sky","wall","SUV"]
+        self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky","wall"]
         self.kitti_templates = ["This is a photo of a {}."]
         print(f"{len(self.kitti_classes)} classes, {len(self.kitti_templates)} templates")
 
@@ -28,6 +31,8 @@ class Clip_Kitti(object):
         if self.device is None:
             self.device = device
             self.model, self.preprocess = clip.load('ViT-L/14@336px', device=self.device)
+            # self.model, self.preprocess = clip.load('ViT-B/32', device=self.device)
+
             self.zeroshot_weights = self.zeroshot_classifier(self.kitti_classes, self.kitti_templates)
         image = self.preprocess(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
@@ -41,5 +46,5 @@ class Clip_Kitti(object):
     
 if __name__ == "__main__":
     clip_kitti = Clip_Kitti()
-    probs, pred = clip_kitti.predict(Image.open("000043.png"),device='cuda')
-    print(probs, pred)
+    probs, pred = clip_kitti.predict(Image.open("/home/xyh/MonoDETR_semi_baseline_33/wrong/6_0.jpg"),device='cuda')
+    print(probs, pred,clip_kitti.kitti_classes[int(pred)])

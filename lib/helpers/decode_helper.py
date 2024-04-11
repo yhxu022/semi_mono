@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from lib.datasets.utils import class2angle
 from utils import box_ops
-
 import torch
 
 
@@ -43,19 +42,19 @@ def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
 
             # 3d bboxs decoding
             depth = dets[i, j, 6]
-            aaa = dets[i, j, 31:34]
             # dimensions decoding
-            dimensions = dets[i, j, 31:34] + cls_mean_size[cls_id]
+            dimensions = dets[i, j, 31:34]
+            dimensions += cls_mean_size[int(cls_id)]
 
             # positions decoding
             x3d = dets[i, j, 34] * info['img_size'][i][0]
             y3d = dets[i, j, 35] * info['img_size'][i][1]
-            locations = calibs[i].img_to_rect_gpu(x3d, y3d, depth)
+            locations = calibs[i].img_to_rect_gpu(x3d, y3d, depth).reshape(-1)
             locations[1] += dimensions[0] / 2
 
             # heading angle decoding
-            alpha = get_heading_angle(dets[i, j, 7:31])
-            ry = calibs[i].alpha2ry(alpha, x)
+            alpha = get_heading_angle_gpu(dets[i, j, 7:31])
+            ry = calibs[i].alpha2ry_gpu(alpha, x)
 
             score = cls_score * dets[i, j, -1]
             pred = torch.cat([torch.tensor([cls_id, alpha], device=dets.device), bbox, dimensions, locations,
@@ -64,10 +63,10 @@ def decode_detections_GPU(dets, info, calibs, cls_mean_size, threshold):
             cls_scores_list.append(cls_score)
             depth_score_list.append(dets[i, j, -1])
             score_list.append(score)
-        results[info['img_id'][i]] = torch.stack(preds)
-        cls_scores[info['img_id'][i]] = torch.tensor(cls_scores_list, device=dets.device)
-        depth_score[info['img_id'][i]] = torch.tensor(depth_score_list, device=dets.device)
-        scores[info['img_id'][i]] = torch.tensor(score_list, device=dets.device)
+        results[int(info['img_id'][i])] = torch.stack(preds)
+        cls_scores[int(info['img_id'][i])] = torch.tensor(cls_scores_list, device=dets.device)
+        depth_score[int(info['img_id'][i])] = torch.tensor(depth_score_list, device=dets.device)
+        scores[int(info['img_id'][i])] = torch.tensor(score_list, device=dets.device)
     return results, cls_scores, depth_score, scores
 
 
@@ -253,3 +252,17 @@ def get_heading_angle(heading):
     cls = np.argmax(heading_bin)
     res = heading_res[cls]
     return class2angle(cls, res, to_label_format=True)
+
+def get_heading_angle_gpu(heading):
+    heading_bin, heading_res = heading[0:12], heading[12:24]
+    cls = torch.argmax(heading_bin)
+    res = heading_res[cls]
+    return class2angle_gpu(cls, res, to_label_format=True)
+
+def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
+    angle_per_class = 2 * torch.pi / float(num_heading_bin)
+    angle_center = cls.float() * angle_per_class  # Ensure cls is float for multiplication
+    angle = angle_center + residual
+    if to_label_format:
+        angle = torch.where(angle > torch.pi, angle - 2 * torch.pi, angle)
+    return angle

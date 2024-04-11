@@ -20,8 +20,8 @@ import argparse
 # import cv2
 # import time
 
-# from tools.semi_base3d_clip import SemiBase3DDetector
-from tools.semi_base3d import SemiBase3DDetector
+from tools.semi_base3d_clip import SemiBase3DDetector
+# from tools.semi_base3d import SemiBase3DDetector
 
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from torch.utils.data import DataLoader
@@ -64,6 +64,7 @@ def main():
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
     subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  4,5
+    # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,
                         num_workers=1,
@@ -95,7 +96,11 @@ def main():
     all_l2_distance = []
     all_depth_score = []
     all_pred_depth_and_cls_scores = []
+    i = 0
     for inputs, calib, targets, info in tqdm(loader):
+        # if i % 500 == 0:
+        #     print(f'all_TP : {all_TP}')
+        # i = i + 1
         input_teacher = inputs[1]
         input_teacher = input_teacher.to("cuda")
         calib = calib.to("cuda")
@@ -190,7 +195,7 @@ def main():
         max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
         # print(f"num_pre: {num_pre}  ;  num_gt: {num_gt}")
         # print(f"max_iou_values:{max_iou_values.shape}")
-        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0]   # [1,2,0]
+        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0.7]   # [1,2,0]
         filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
         pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
         pred_depth_and_cls_scores = [score_list.cpu().numpy()[i] for i in valid_indices]
@@ -220,6 +225,6 @@ def main():
     print(f"all_FP  --  {all_FP}")
     all_FN = all_gts - all_TP
     print(f"all_FN  --  {all_FN}")
-
+    print(len(all_depth_score))
 if __name__ == '__main__':
     main()

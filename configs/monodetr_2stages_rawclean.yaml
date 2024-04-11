@@ -128,6 +128,7 @@ lr_scheduler:
 
   # when type is 'step':
   warmup: True
+  warmup_steps: 500
   in_proportion: False # 按比率设置decay_list
   decay_rate: 0.1
 

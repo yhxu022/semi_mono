@@ -247,7 +247,7 @@ class Calibration(object):
         x = torch.tensor(x, device=device)
         y = ((v - self.cv) * depth_rect) / self.fv + self.ty
         y = torch.tensor(y, device=device)
-        pts_rect = torch.stack(
+        pts_rect = torch.cat(
             (torch.reshape(x, (-1, 1)), torch.reshape(y, (-1, 1)), torch.reshape(depth_rect, (-1, 1))),
             dim=1)
         return pts_rect
@@ -323,7 +323,21 @@ class Calibration(object):
             ry -= 2 * np.pi
         if ry < -np.pi:
             ry += 2 * np.pi
+        return ry
 
+    def alpha2ry_gpu(self, alpha, u):
+        # Ensure alpha, u, cu, and fu are on the same device
+        # device = alpha.device
+        # Calculate rotation_y
+        device = alpha.device
+        cu = torch.tensor(self.cu, device=device)
+        fu = torch.tensor(self.fu, device=device)
+        ry = alpha + torch.atan2(u - cu, fu)
+
+        if ry > torch.pi:
+            ry -= 2 * torch.pi
+        if ry < -torch.pi:
+            ry += 2 * torch.pi
         return ry
 
     def ry2alpha(self, ry, u):
