@@ -9,8 +9,9 @@ class Clip_Kitti(object):
         # self.kitti_classes = ['Pedestrian', 'Car', 'Cyclist',"Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
                               # "Black Car","Black Van","Black Truck","Gray Car","Gray Van","Gray Truck", "SUV"]
         # self.kitti_classes = ["Background",'Car', 'Cyclist',"Van","Truck","asphalt road","road","tree","sky","wall","SUV"]
-        # self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky", "wall", "sedan"]
-        self.kitti_classes = ['Car', "Van", "Truck"]
+        self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky", "wall", "sedan"]
+        # self.kitti_classes = ["Van", 'Car', "Truck"]
+        # self.kitti_classes = ["Car", "Truck","Pickup Truck","sedan"]
         self.kitti_templates = ["This is a photo of a {}."]
         print(f"{len(self.kitti_classes)} classes, {len(self.kitti_templates)} templates")
 
@@ -44,7 +45,15 @@ class Clip_Kitti(object):
             probs = logits.softmax(dim=-1).cpu().numpy()
             pred = logits.topk(max((1,)), 1, True, True)[1].t()
         return probs, pred
-    
+
+    def analyze_pred_result(self, prob, pred, label):
+        if self.kitti_classes[int(pred)] == "Car" and label == 1:
+            return True
+        if "SUV" in self.kitti_classes:
+            return True
+        if "sedan" in self.kitti_classes:
+            return True
+
 if __name__ == "__main__":
     clip_kitti = Clip_Kitti()
     probs, pred = clip_kitti.predict(Image.open("/home/xyh/MonoDETR_semi_baseline_33/wrong/6_0.jpg"),device='cuda')

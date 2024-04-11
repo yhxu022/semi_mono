@@ -498,7 +498,8 @@ class Semi_Mono_DETR(BaseModel):
                             # croped_image.save("croped_image.jpg")
                             probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
                             # if int(pred) == pseudo_labels[i] or int(pred) == len(probs[0])-1:
-                            if int(pred) == pseudo_labels[i]:
+                            # if int(pred) == pseudo_labels[i]:
+                            if self.clip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i]):
                                 mask_cls_pseudo_thr[i] = True
                                 prob_from_clip.append(probs[0][pred])
                             # else:
