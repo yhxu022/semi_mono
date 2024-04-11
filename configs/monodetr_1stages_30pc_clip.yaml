@@ -1,6 +1,8 @@
 random_seed: 1
 deterministic: False
 two_stages: False
+use_clip: True
+
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'

@@ -9,7 +9,8 @@ class Clip_Kitti(object):
         # self.kitti_classes = ['Pedestrian', 'Car', 'Cyclist',"Van","Truck","Person_sitting","Tram","Background","asphalt road","road","tree","sky","wall"]
                               # "Black Car","Black Van","Black Truck","Gray Car","Gray Van","Gray Truck", "SUV"]
         # self.kitti_classes = ["Background",'Car', 'Cyclist',"Van","Truck","asphalt road","road","tree","sky","wall","SUV"]
-        self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky","wall"]
+        # self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky", "wall", "sedan"]
+        self.kitti_classes = ['Car', "Van", "Truck"]
         self.kitti_templates = ["This is a photo of a {}."]
         print(f"{len(self.kitti_classes)} classes, {len(self.kitti_templates)} templates")
 

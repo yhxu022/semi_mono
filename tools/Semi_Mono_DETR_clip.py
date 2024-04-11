@@ -80,6 +80,9 @@ class Semi_Mono_DETR(BaseModel):
         self.max_objs = 50
         self.inference_set = inference_set
         self.unlabeled_set = unlabeled_set
+        self.use_clip = cfg.get("use_clip", True)
+        if self.use_clip:
+            print("------USE CLIP TO HELP------")
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -158,6 +161,10 @@ class Semi_Mono_DETR(BaseModel):
         elif mode == 'get_pseudo_targets':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
+            if self.use_clip is True:
+                clip_inputs = inputs
+            else:
+                clip_inputs = None
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
@@ -174,7 +181,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_depth_score_thr",
                                                                                                     0),
                                                                                                 batch_targets=targets,
-                                                                                                batch_inputs=inputs,
+                                                                                                batch_inputs=clip_inputs,
                                                                                                 cls_clip_threshold=self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_clip_thr",
@@ -207,7 +214,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_depth_score_thr",
                                                                                                     0),
                                                                                                 batch_targets=targets,
-                                                                                                batch_inputs=inputs, 
+                                                                                                batch_inputs=clip_inputs,
                                                                                                 cls_clip_threshold=self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_clip_thr",
@@ -494,11 +501,11 @@ class Semi_Mono_DETR(BaseModel):
                             if int(pred) == pseudo_labels[i]:
                                 mask_cls_pseudo_thr[i] = True
                                 prob_from_clip.append(probs[0][pred])
-                            else:
-                                if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
-                                    with open(file="your_file_path.txt", mode="a") as f:
-                                        f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
-                                        croped_image.save(f"wrong/{info['img_id'][bz]}_{i}.jpg")
+                            # else:
+                            #     if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
+                            #         with open(file="your_file_path.txt", mode="a") as f:
+                            #             f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
+                            #             croped_image.save(f"wrong/{info['img_id'][bz]}_{i}.jpg")
                     else:
                         mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])
