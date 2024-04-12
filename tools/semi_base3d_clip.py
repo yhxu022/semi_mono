@@ -80,13 +80,13 @@ class SemiBase3DDetector(BaseModel):
         if cfg.get("two_stages", False):
             print("----------------TWO STAGES----------------")
             #支持加载MonoDETR官方训练权重
-            # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
-            # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+            student_model.load_state_dict(torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
+            teacher_model.load_state_dict(torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
             #加载自己预训练的权重
-            check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
-            ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-            student_model.load_state_dict(ckpt)
-            teacher_model.load_state_dict(ckpt)
+            # check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
+            # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+            # student_model.load_state_dict(ckpt)
+            # teacher_model.load_state_dict(ckpt)
         else:
             print("----------------ONE STAGE----------------")
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set, unlabeled_set)
@@ -204,7 +204,6 @@ class SemiBase3DDetector(BaseModel):
         cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list,\
             regression_mask, regression_cls_score, regression_topk_boxes    = self.get_pseudo_targets(
             teacher_inputs, unsup_calibs, unsup_targets, unsup_info)
-        
         #输入可视化
         # student_image=student_inputs[0].cpu().numpy().transpose(1, 2, 0)
         # teacher_image=teacher_inputs[0].cpu().numpy().transpose(1, 2, 0)
@@ -337,10 +336,11 @@ class SemiBase3DDetector(BaseModel):
         elif mode=="regression":
             message_hub.update_scalar('train/batch_regression_unsup_pseudo_instances_num', unsup_pseudo_instances_num)
         if unsupweight_from_hook is None:
-            self.unsup_weight = self.semi_train_cfg.get(
-                'unsup_weight', 1.) 
             # self.unsup_weight = self.semi_train_cfg.get(
-            #     'unsup_weight', 1.) if unsup_pseudo_instances_num > 0 else 0.
+            #     'unsup_weight', 1.) 
+            #一个batch没有一个object就屏蔽掉
+            self.unsup_weight = self.semi_train_cfg.get(
+                'unsup_weight', 1.) if unsup_pseudo_instances_num > 0 else 0.
         losses = reweight_loss_dict(losses, self.unsup_weight)
 
         # 与教师模型每一层的输出计算一致性损失

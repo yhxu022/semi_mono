@@ -83,6 +83,7 @@ class Semi_Mono_DETR(BaseModel):
         self.use_clip = cfg.get("use_clip", True)
         if self.use_clip:
             print("------USE CLIP TO HELP------")
+        self.decouple = cfg["semi_train_cfg"].get('decouple', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -186,15 +187,18 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_clip_thr",
                                                                                                     0.5))
-                regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
-                    dets, calibs, dets.shape[0],
-                    self.cfg["semi_train_cfg"][
-                        "regression_cls_pseudo_thr"],
-                    self.cfg["semi_train_cfg"][
-                        "regression_score_pseudo_thr"],
-                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0 ),
-                    batch_targets=targets,
-                    batch_inputs=None)
+                if self.decouple:
+                    regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
+                        dets, calibs, dets.shape[0],
+                        self.cfg["semi_train_cfg"][
+                            "regression_cls_pseudo_thr"],
+                        self.cfg["semi_train_cfg"][
+                            "regression_score_pseudo_thr"],
+                        self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0),
+                        batch_targets=targets,
+                        batch_inputs=None)
+                else:
+                    regression_pseudo_targets_list = regression_mask = regression_cls_score = None
                 cls_topk_boxes = regression_topk_boxes = topk_boxes
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
@@ -220,14 +224,18 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     "cls_clip_thr",
                                                                                                     0.5)
                                                                                                 )
-                regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
-                    dets, calibs, dets.shape[0],
-                    self.cfg["semi_train_cfg"][
-                        "regression_cls_pseudo_thr"],
-                    self.cfg["semi_train_cfg"][
-                        "regression_score_pseudo_thr"],
-                    self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0),
-                    batch_inputs=None)
+                if self.decouple:
+                    regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
+                        dets, calibs, dets.shape[0],
+                        self.cfg["semi_train_cfg"][
+                            "regression_cls_pseudo_thr"],
+                        self.cfg["semi_train_cfg"][
+                            "regression_score_pseudo_thr"],
+                        self.cfg["semi_train_cfg"].get("regression_depth_score_thr", 0),
+                        batch_targets=targets,
+                        batch_inputs=None)
+                else:
+                    regression_pseudo_targets_list = regression_mask = regression_cls_score = None
                 cls_topk_boxes = regression_topk_boxes = topk_boxes
 
             return cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, regression_pseudo_targets_list, \

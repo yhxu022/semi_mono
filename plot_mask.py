@@ -85,8 +85,6 @@ def plot(jsonfile):
     unsup_loss_center_1=[]
     sup_loss_depth_map=[]
     unsup_loss_depth_map=[]
-    teacher_car_moderate=[]
-    student_car_moderate=[]
     step_val=[]
     # 从JSON文件中读取数据
     with open(jsonfile, 'r') as f:
@@ -176,13 +174,14 @@ def plot(jsonfile):
             if "lr" in new_data:
                 lr.append(new_data["lr"])
             if "teacher/Car_aos_easy_R40" in new_data:
+                step_val.append(new_data["step"])
                 teacher_Car_aos_easy_R40.append(new_data["teacher/Car_aos_easy_R40"])
-                step.append(new_data["step"])
             if "teacher/Car_aos_moderate_R40" in new_data:
                 teacher_Car_aos_moderate_R40.append(new_data["teacher/Car_aos_moderate_R40"])
             if "teacher/Car_aos_hard_R40" in new_data:
                 teacher_Car_aos_hard_R40.append(new_data["teacher/Car_aos_hard_R40"])
             if "student/Car_aos_easy_R40" in new_data:
+                step.append(new_data["step"])
                 student_Car_aos_easy_R40.append(new_data["student/Car_aos_easy_R40"])
             if "student/Car_aos_moderate_R40" in new_data:
                 student_Car_aos_moderate_R40.append(new_data["student/Car_aos_moderate_R40"])   
@@ -249,9 +248,9 @@ def plot(jsonfile):
     plt.legend()
     plt.savefig(os.path.join(savedir,'loss.png'), dpi=1000)
     plt.figure(3)
-    plt.plot(step, teacher_Car_aos_easy_R40, label='teacher_Car_aos_easy_R40')
-    plt.plot(step, teacher_Car_aos_moderate_R40, label='teacher_Car_aos_moderate_R40')
-    plt.plot(step, teacher_Car_aos_hard_R40, label='teacher_Car_aos_hard_R40')
+    plt.plot(step_val, teacher_Car_aos_easy_R40, label='teacher_Car_aos_easy_R40')
+    plt.plot(step_val, teacher_Car_aos_moderate_R40, label='teacher_Car_aos_moderate_R40')
+    plt.plot(step_val, teacher_Car_aos_hard_R40, label='teacher_Car_aos_hard_R40')
     plt.plot(step, student_Car_aos_easy_R40, label="student_Car_aos_easy_R40")
     plt.plot(step, student_Car_aos_moderate_R40, label="student_Car_aos_moderate_R40")
     plt.plot(step, student_Car_aos_hard_R40, label="student_Car_aos_hard_R40")
@@ -401,5 +400,5 @@ def plot(jsonfile):
     plt.savefig(os.path.join(savedir, 'Car_3d_moderate_R40.png'), dpi=1000)
 if __name__ == "__main__":
     plot(
-        "/data/ipad_3d/monocular/semi_mono/outputs/monodetr_2stages_30pc_clip@040814/20240408_145529/vis_data/20240408_145529.json"
+        "/data/ipad_3d/monocular/semi_mono/outputs/mondetr_4gpu_0cw_1unsup_GT_30pc@041220/20240412_204006/vis_data/20240412_204006.json"
     )
