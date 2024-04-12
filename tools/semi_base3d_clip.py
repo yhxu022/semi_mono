@@ -80,13 +80,13 @@ class SemiBase3DDetector(BaseModel):
         if cfg.get("two_stages", False):
             print("----------------TWO STAGES----------------")
             #支持加载MonoDETR官方训练权重
-            student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
-            teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+            # student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+            # teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
             #加载自己预训练的权重
-            # check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
-            # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
-            # student_model.load_state_dict(ckpt)
-            # teacher_model.load_state_dict(ckpt)
+            check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
+            ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
+            student_model.load_state_dict(ckpt)
+            teacher_model.load_state_dict(ckpt)
         else:
             print("----------------ONE STAGE----------------")
         self.student = Semi_Mono_DETR(student_model, student_loss, cfg, test_loader, inference_set, unlabeled_set)
@@ -103,6 +103,9 @@ class SemiBase3DDetector(BaseModel):
                                     loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
                                     activated=False)
         self.teacher.clip_kitti = Clip_Kitti()
+        self.decouple = self.semi_train_cfg.get('decouple', False)
+        self.cls_losses = self.semi_train_cfg.get('cls_losses', ['labels'])
+        self.regression_losses = self.semi_train_cfg.get('regression_losses', ['boxes', 'dims', 'angles'])
 
     def forward(self, inputs, calibs, targets, info, mode):
         """The unified entry for a forward process in both training and test.
@@ -222,9 +225,10 @@ class SemiBase3DDetector(BaseModel):
         # 用分类伪标签监督
         losses.update(**self.loss_by_pseudo_instances(
             student_inputs, unsup_calibs, cls_pseudo_targets_list, cls_mask, cls_cls_score, cls_topk_boxes, unsup_info, mode="cls"))
-        # 用回归伪标签监督
-        # losses.update(**self.loss_by_pseudo_instances(
-        #     student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
+        if self.decouple is True: 
+        #用回归伪标签监督
+            losses.update(**self.loss_by_pseudo_instances(
+            student_inputs, unsup_calibs, regression_pseudo_targets_list, regression_mask, regression_cls_score, regression_topk_boxes, unsup_info, mode="regression"))
         # 用GT监督
         # unsup_gt_targets_list = prepare_targets(unsup_targets, student_inputs.shape[0])
         # losses.update(**self.loss_by_pseudo_instances(
@@ -307,19 +311,21 @@ class SemiBase3DDetector(BaseModel):
             dict: A dictionary of loss components
         """
         if mode=="cls":
+            self.student.loss.losses=self.cls_losses
             #2d属性损失
             # self.student.loss.losses=['labels','boxes', 'center']
             #分类损失
-            self.student.loss.losses=['labels']
+            # self.student.loss.losses=['labels']
             # self.student.loss.losses=[]
         elif mode=="regression":
+            self.student.loss.losses=self.regression_losses
             #3d属性损失
             #self.student.loss.losses=['boxes',  'dims', 'angles']
             # self.student.loss.losses=['boxes','dims', 'angles', 'center']
             #self.student.loss.losses=['dims', 'angles', 'depth_map']
             #回归损失
             # self.student.loss.losses=['boxes', 'dims', 'angles', 'center']
-            self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
+            #self.student.loss.losses=['boxes', 'depths', 'dims', 'angles', 'center', 'depth_map']
         losses = self.student.forward(unsup_inputs, unsup_calibs, pseudo_targets_list, unsup_info, mode='unsup_loss')
         unsup_pseudo_instances_num = sum([
             len(pseudo_targets["labels"])
