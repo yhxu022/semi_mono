@@ -43,6 +43,8 @@ semi_train_cfg:
   cls_cls_pseudo_thr: 0.5 # 用于分类的类pseudobox 阈值
   cls_score_pseudo_thr: 0 # 用于分类的pseudobox阈值
   cls_depth_score_thr: 0 # 用于分类的深度分阈值
+  # if use_clip is True:
+  cls_clip_thr: 0.0 # 用于分类的clip阈值
 semi_test_cfg: 
   predict_on: 'teacher'
 mean_teacher_hook:

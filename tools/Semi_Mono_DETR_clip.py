@@ -186,7 +186,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                 cls_clip_threshold=self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_clip_thr",
-                                                                                                    0.5))
+                                                                                                    0.0))
                 if self.decouple:
                     regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
                         dets, calibs, dets.shape[0],
@@ -222,7 +222,7 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                 cls_clip_threshold=self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_clip_thr",
-                                                                                                    0.5)
+                                                                                                    0.0)
                                                                                                 )
                 if self.decouple:
                     regression_pseudo_targets_list, regression_mask, regression_cls_score = self.get_pseudo_targets_list(
@@ -287,7 +287,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs)
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -298,7 +298,8 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs)
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",
+                                                                                                    0.0))
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
 
     def prepare_targets(self, targets, batch_size):
@@ -315,7 +316,7 @@ class Semi_Mono_DETR(BaseModel):
         return targets_list
 
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
-                                depth_score_thr,batch_targets=None,batch_inputs=None,cls_clip_threshold=0.5):
+                                depth_score_thr,batch_targets=None,batch_inputs=None,cls_clip_threshold=0.0):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
@@ -471,7 +472,7 @@ class Semi_Mono_DETR(BaseModel):
         return dets_img
 
     def get_boxes_lidar_and_clsscore(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr,
-                                     score_pseudo_thr, depth_score_thr, info,batch_inputs=None):
+                                     score_pseudo_thr, depth_score_thr, info,batch_inputs=None,cls_clip_threshold=0.0):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
         depth_score_list = []
@@ -507,7 +508,7 @@ class Semi_Mono_DETR(BaseModel):
                             probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
                             # if int(pred) == pseudo_labels[i] or int(pred) == len(probs[0])-1:
                             # if int(pred) == pseudo_labels[i]:
-                            if self.clip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i]):
+                            if self.clip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i],thr=cls_clip_threshold):
                                 mask_cls_pseudo_thr[i] = True
                                 prob_from_clip.append(probs[0][pred])
                             # else:
