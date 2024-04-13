@@ -100,7 +100,7 @@ class SemiBase3DDetector(BaseModel):
         if self.semi_train_cfg.get('freeze_teacher', True) is True:
             self.freeze(self.teacher)
         self.depth_qfl=QualityFocalLoss(use_sigmoid=True,beta=2.0,reduction='mean',\
-                                    loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 1.),\
+                                    loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 0.0),\
                                     activated=False)
         self.teacher.clip_kitti = Clip_Kitti()
         self.decouple = self.semi_train_cfg.get('decouple', False)
@@ -315,7 +315,6 @@ class SemiBase3DDetector(BaseModel):
             # self.student.loss.losses=['labels','boxes', 'center']
             #分类损失
             # self.student.loss.losses=['labels']
-            # self.student.loss.losses=[]
         elif mode=="regression":
             self.student.loss.losses=self.regression_losses
             #3d属性损失
@@ -353,10 +352,10 @@ class SemiBase3DDetector(BaseModel):
         #  cls_score, topk_boxes,self.student.loss.indices)
             losses.update({"consistency_loss": consistency_loss * self.semi_train_cfg.get(
                 'consistency_weight', 1.)})
-        # if mode=="regression":
-            # depth_map_consistency_loss=self.depth_map_consistency_loss\
-            #     (torch.flatten(self.student.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2),torch.flatten(self.teacher.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2))
-            # losses.update({"loss_depth_map": depth_map_consistency_loss})
+        if mode=="regression" and self.semi_train_cfg.get('depth_map_consistency_loss_weight', 0.0)>0:
+            depth_map_consistency_loss=self.depth_map_consistency_loss\
+                (torch.flatten(self.student.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2),torch.flatten(self.teacher.model.depth_map_logits.permute(0,2,3,1), start_dim=0, end_dim=2))
+            losses.update({"loss_depth_map": depth_map_consistency_loss})
         unsup_loss_dict = rename_loss_dict('unsup_',
                                            losses)
         return unsup_loss_dict
