@@ -41,19 +41,20 @@ class Glip_Kitti(object):
                 caption=self.TEXT_PROMPT,
                 box_threshold=self.BOX_TRESHOLD,
                 text_threshold=self.TEXT_TRESHOLD,
+                device=self.device,
                 remove_combined=True
             )
 
         return boxes,logits
 
     def analyze_pred_result(self, boxes_from_glip, boxes_from_pres):
-        IOU = bbox_iou(boxes_from_glip,boxes_from_pres)
+        IOU = bbox_iou(boxes_from_glip, boxes_from_pres)
 
 
 
 if __name__ == "__main__":
-    model = load_model("/data/ipad_3d/monocular/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
-                       "/data/ipad_3d/monocular/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
+    model = load_model("thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
+                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
     IMAGE_PATH = "/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/000052.png"
     TEXT_PROMPT = "van . car . truck ."
     BOX_TRESHOLD = 0.35

@@ -7,9 +7,9 @@ from uncertainty_estimator import UncertaintyEstimator
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
 from torchvision.transforms import ToPILImage
+from torchvision.ops import box_convert
 
 def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
-
     angle_per_class = 2 * torch.pi / float(num_heading_bin)
     angle_center = cls.float() * angle_per_class  # Ensure cls is float for multiplication
     angle = angle_center + residual
@@ -19,6 +19,7 @@ def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
         angle = torch.where(angle > torch.pi, angle - 2 * torch.pi, angle)
 
     return angle
+
 
 def alpha2ry_gpu(calib, alpha, u):
     """
@@ -46,6 +47,7 @@ def alpha2ry_gpu(calib, alpha, u):
 
     return ry
 
+
 def crop(input, bbox2d):
     bbox2d[0] = bbox2d[0] * 1280
     bbox2d[1] = bbox2d[1] * 384
@@ -61,9 +63,10 @@ def crop(input, bbox2d):
     y1 = torch.round(corner_2d[1]).int()
     x2 = torch.round(corner_2d[2]).int()
     y2 = torch.round(corner_2d[3]).int()
-    input_croped = input[:,y1:y2, x1:x2]
+    input_croped = input[:, y1:y2, x1:x2]
     return input_croped
-    
+
+
 class Semi_Mono_DETR(BaseModel):
     def __init__(self, model, loss, cfg, dataloader, inference_set=None, unlabeled_set=None):
         super().__init__()
@@ -183,7 +186,8 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     0),
                                                                                                 batch_targets=targets,
                                                                                                 batch_inputs=glip_inputs,
-                                                                                                cls_glip_threshold=self.cfg[
+                                                                                                cls_glip_threshold=
+                                                                                                self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_glip_thr",
                                                                                                     0.0))
@@ -219,7 +223,8 @@ class Semi_Mono_DETR(BaseModel):
                                                                                                     0),
                                                                                                 batch_targets=targets,
                                                                                                 batch_inputs=glip_inputs,
-                                                                                                cls_glip_threshold=self.cfg[
+                                                                                                cls_glip_threshold=
+                                                                                                self.cfg[
                                                                                                     "semi_train_cfg"].get(
                                                                                                     "cls_glip_thr",
                                                                                                     0.0)
@@ -287,7 +292,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr",0.0))
+                    info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -298,7 +303,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr",0.0))
+                    info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
 
     def prepare_targets(self, targets, batch_size):
@@ -315,7 +320,7 @@ class Semi_Mono_DETR(BaseModel):
         return targets_list
 
     def get_pseudo_targets_list(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr, score_pseudo_thr,
-                                depth_score_thr,batch_targets=None,batch_inputs=None,cls_glip_threshold=0.0):
+                                depth_score_thr, batch_targets=None, batch_inputs=None, cls_glip_threshold=0.0):
         pseudo_targets_list = []
         mask_list = []
         cls_score_list = batch_dets[:, :, 1]
@@ -330,19 +335,19 @@ class Semi_Mono_DETR(BaseModel):
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
-                if dets[i, 1] > cls_pseudo_thr :
+                if dets[i, 1] > cls_pseudo_thr:
                     if batch_inputs is not None:
 
-                        #如果初筛通过,将2dbbox对应的图片区域裁剪下来送入glip模型精筛,若为正样本则保留,否则舍弃
+                        # 如果初筛通过,将2dbbox对应的图片区域裁剪下来送入glip模型精筛,若为正样本则保留,否则舍弃
                         boxes = dets[i, 2:6].to(torch.float32)
                         img = batch_inputs[bz]
                         img_croped = crop(img, boxes.clone())
-                        if img_croped.shape[1]>0 and img_croped.shape[2]>0:
-                            croped_image=img_croped.cpu().numpy().transpose(1, 2, 0)
+                        if img_croped.shape[1] > 0 and img_croped.shape[2] > 0:
+                            croped_image = img_croped.cpu().numpy().transpose(1, 2, 0)
                             mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
                             std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
                             croped_image = (croped_image * std + mean) * 255.0
-                            croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
+                            croped_image = ToPILImage()(np.round(croped_image).astype(np.uint8))
                             # croped_image.save("croped_image.jpg")
                             probs, pred = self.glip_kitti.predict(croped_image, device=img.device)
                             if self.glip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i],
@@ -351,9 +356,9 @@ class Semi_Mono_DETR(BaseModel):
                     else:
                         mask_cls_pseudo_thr[i] = True
                 score = dets[i, 1] * dets[i, -1]
-                if score > score_pseudo_thr :
+                if score > score_pseudo_thr:
                     mask_score_pseudo_thr[i] = True
-                if dets[i, -1] > depth_score_thr :
+                if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             mask_list.append(mask)
@@ -473,7 +478,8 @@ class Semi_Mono_DETR(BaseModel):
         return dets_img
 
     def get_boxes_lidar_and_clsscore(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr,
-                                     score_pseudo_thr, depth_score_thr, info,batch_inputs=None,cls_glip_threshold=0.0):
+                                     score_pseudo_thr, depth_score_thr, info, batch_inputs=None,
+                                     cls_glip_threshold=0.0):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
         depth_score_list = []
@@ -495,28 +501,11 @@ class Semi_Mono_DETR(BaseModel):
                     mask_cls_type[i] = True
                 if dets[i, 1] > cls_pseudo_thr:
                     if batch_inputs is not None:
-                        # 如果初筛通过,将2dbbox对应的图片区域裁剪下来送入glip模型精筛,若为正样本则保留,否则舍弃
-                        boxes = dets[i, 2:6].to(torch.float32)
+                        bboxes_from_preds = dets[:, 2:6].to(torch.float32)
                         img = batch_inputs[bz]
-                        img_croped = crop(img, boxes.clone())
-                        if img_croped.shape[1] > 0 and img_croped.shape[2] > 0:
-                            croped_image = img_croped.cpu().numpy().transpose(1, 2, 0)
-                            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-                            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-                            croped_image = (croped_image * std + mean) * 255.0
-                            croped_image = ToPILImage()(np.round(croped_image).astype(np.uint8))
-                            # croped_image.save("croped_image.jpg")
-                            probs, pred = self.glip_kitti.predict(croped_image, device=img.device)
-                            # if int(pred) == pseudo_labels[i] or int(pred) == len(probs[0])-1:
-                            # if int(pred) == pseudo_labels[i]:
-                            if self.glip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i],thr=cls_glip_threshold):
-                                mask_cls_pseudo_thr[i] = True
-                                prob_from_glip.append(probs[0][pred])
-                            # else:
-                            #     if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
-                            #         with open(file="your_file_path.txt", mode="a") as f:
-                            #             f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
-                            #             croped_image.save(f"wrong/{info['img_id'][bz]}_{i}.jpg")
+                        boxes_from_gd, logits = self.glip_kitti.predict(img, device=img.device)
+
+
                     else:
                         mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])

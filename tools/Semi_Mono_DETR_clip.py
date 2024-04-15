@@ -298,8 +298,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",
-                                                                                                    0.0))
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
 
     def prepare_targets(self, targets, batch_size):
@@ -345,7 +344,8 @@ class Semi_Mono_DETR(BaseModel):
                             croped_image=ToPILImage()(np.round(croped_image).astype(np.uint8))
                             # croped_image.save("croped_image.jpg")
                             probs, pred = self.clip_kitti.predict(croped_image, device=img.device)
-                            if int(pred)==pseudo_labels[i] and probs.max() > cls_clip_threshold:
+                            if self.clip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i],
+                                                                   thr=cls_clip_threshold):
                                 mask_cls_pseudo_thr[i] = True
                     else:
                         mask_cls_pseudo_thr[i] = True
