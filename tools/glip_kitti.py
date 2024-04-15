@@ -5,6 +5,7 @@ from tqdm import tqdm
 from groundingdino.util.inference import load_model, load_image, predict, annotate
 import cv2
 from utils.iou2d_utils import bbox_iou
+from torchvision.ops import box_convert
 class Glip_Kitti(object):
     def __init__(self):
         self.device = None
@@ -31,8 +32,7 @@ class Glip_Kitti(object):
         if self.device is None:
             self.device = device
             self.model = load_model("thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
-                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
-
+                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
 
         with torch.no_grad():
             boxes, logits, phrases = predict(
@@ -41,15 +41,23 @@ class Glip_Kitti(object):
                 caption=self.TEXT_PROMPT,
                 box_threshold=self.BOX_TRESHOLD,
                 text_threshold=self.TEXT_TRESHOLD,
-                device=self.device,
+                device=device,
                 remove_combined=True
             )
-
         return boxes,logits
 
-    def analyze_pred_result(self, boxes_from_glip, boxes_from_pres):
-        IOU = bbox_iou(boxes_from_glip, boxes_from_pres)
+    def analyze_pred_result(self, boxes_from_glip, boxes_from_preds, IOU_thr=0.7):
+        w = 1280
+        h = 384
+        bbox_from_glip_orisize = boxes_from_glip * torch.Tensor([w, h, w, h])
 
+        bbox_from_preds_orisize = boxes_from_preds * torch.Tensor([w, h, w, h])
+
+        IOUs = bbox_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
+        max_iou, _ = torch.max(IOUs, dim=1)
+        indexes = torch.where(max_iou > IOU_thr)[0]
+        indexes = indexes.tolist()
+        return indexes
 
 
 if __name__ == "__main__":

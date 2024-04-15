@@ -20,7 +20,8 @@ import argparse
 # import cv2
 # import time
 
-from tools.semi_base3d_clip import SemiBase3DDetector
+from tools.semi_base3d_glip import SemiBase3DDetector
+# from tools.semi_base3d_clip import SemiBase3DDetector
 # from tools.semi_base3d import SemiBase3DDetector
 
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
@@ -63,7 +64,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  4,5
+    subset = Subset(unlabeled_dataset, range(4,5))     # 3712 3769 14940 40404  (4,5)->id=
     # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,

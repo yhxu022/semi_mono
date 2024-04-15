@@ -7,7 +7,7 @@ from uncertainty_estimator import UncertaintyEstimator
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
 from torchvision.transforms import ToPILImage
-from torchvision.ops import box_convert
+
 
 def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
     angle_per_class = 2 * torch.pi / float(num_heading_bin)
@@ -500,14 +500,7 @@ class Semi_Mono_DETR(BaseModel):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
                 if dets[i, 1] > cls_pseudo_thr:
-                    if batch_inputs is not None:
-                        bboxes_from_preds = dets[:, 2:6].to(torch.float32)
-                        img = batch_inputs[bz]
-                        boxes_from_gd, logits = self.glip_kitti.predict(img, device=img.device)
-
-
-                    else:
-                        mask_cls_pseudo_thr[i] = True
+                    mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])
 
                 score = dets[i, 1] * dets[i, -1]
@@ -515,9 +508,22 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
+
+
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             # print(mask.shape)
             dets = dets[mask]
+            mask_from_glip = np.zeros((len(dets[:, 0])), dtype=bool)
+            if batch_inputs is not None:
+                bboxes_from_preds = dets[:, 2:6].to(torch.float32)
+                img = batch_inputs[bz]
+                boxes_from_gd, logits = self.glip_kitti.predict(img, device=img.device)
+                indexes = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
+                                                       boxes_from_preds=bboxes_from_preds, IOU_thr=0.7)
+                print(indexes)
+                mask_from_glip[indexes] = True
+
+            dets = dets[mask_from_glip]
             pseudo_labels_list.append(dets[:, 0])
             if len(dets) > 0:
                 scores = dets[:, 1]
