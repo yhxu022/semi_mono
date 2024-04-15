@@ -20,6 +20,8 @@ boxes, logits, phrases = predict(
     text_threshold=TEXT_TRESHOLD,
     remove_combined=True
 )
-
+print(boxes.shape)
+print(logits.shape)
+print(phrases)
 annotated_frame = annotate(image_source=image_source, boxes=boxes, logits=logits, phrases=phrases)
 cv2.imwrite("annotated_image.jpg", annotated_frame)
