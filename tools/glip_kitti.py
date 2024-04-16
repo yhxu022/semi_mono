@@ -254,9 +254,10 @@ class Glip_Kitti(object):
 
         preds_indexes_filtered=[]
         idx_selected = []
+        print(phrases)
         for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
             if max_indices[pred_idx] not in idx_selected:
-                if phrases[glip_idx] == 'Car':
+                if phrases[glip_idx] == 'car':
                     preds_indexes_filtered.append(pred_idx.item())
                     idx_selected.append(max_indices[pred_idx])
 
