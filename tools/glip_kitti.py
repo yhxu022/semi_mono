@@ -139,8 +139,8 @@ class Glip_Kitti(object):
         if self.device is None:
             self.device = device
             print('LOADING Grounding DINO......')
-            self.model = load_model("/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
-                       "/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
+            self.model = load_model("thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
+                       "thirdparty/GroundingDINO/groundingdino/weights/groundingdino_swinb_cogcoor.pth",device=device)
             self.model = self.model.to(device)
             print('LOADING OVER')
             tokenizer = self.model.tokenizer
@@ -254,7 +254,7 @@ class Glip_Kitti(object):
 
         preds_indexes_filtered=[]
         idx_selected = []
-        print(phrases)
+        # print(phrases)
         for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
             if max_indices[pred_idx] not in idx_selected:
                 if phrases[glip_idx] == 'car':
@@ -270,8 +270,8 @@ class Glip_Kitti(object):
 if __name__ == "__main__":
 
 
-    model = load_model("thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
-                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
+    model = load_model("thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
+                       "thirdparty/GroundingDINO/groundingdino/weights/groundingdino_swinb_cogcoor.pth")
     IMAGE_PATH = "/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/000052.png"
     TEXT_PROMPT = "van . car . truck ."
     BOX_TRESHOLD = 0.35

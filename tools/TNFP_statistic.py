@@ -30,7 +30,7 @@ from torch.utils.data import Subset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
-
+from utils.iou2d_utils import bbox_iou
 
 """
 有没有可能时分类分数的伪标签不能反应教师预测的包围盒的质量，可以试试统计下预训练模型的依据分类分数筛选的boxes和gt的iou与该boxes的分类分数是不是正比，做一个散点图看看
@@ -64,7 +64,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(2))     # 3712 3769 14940 40404  (4,5)->id=
+    subset = Subset(unlabeled_dataset, range(20))     # 3712 3769 14940 40404  (4,5)->id=
     # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,
@@ -89,9 +89,7 @@ def main():
     neg_in_pred = 0
 
     all_TP = 0
-    all_TN = 0
-    all_FP = 0
-    all_FN = 0
+    all_TP_2d = 0
     all_scores = []
     all_max_ious = []
     all_l2_distance = []
@@ -110,7 +108,7 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list = \
+        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
@@ -145,6 +143,7 @@ def main():
 
 
         gt_boxes = []
+        gt_boxes_2d = []
         loc_gts = []
         calibs_gt = [subset.dataset.get_calib(index) for index in info['img_id']]
         calib_gt = calibs_gt[0]
@@ -157,13 +156,21 @@ def main():
                 w = np.array([gt.w]).reshape((1, -1))
                 l = np.array([gt.l]).reshape((1, -1))
                 ry = np.array([gt.ry]).reshape((1, -1))
+                gt_box_2d = gt.box2d
                 loc_lidar = calib_gt.rect_to_lidar(loc)
                 loc_lidar[:, 2] += h[:, 0] / 2
                 heading = -(np.pi / 2 + ry)
                 gt_lidar = np.concatenate([loc_lidar, l, w, h, heading], axis=1)
                 gt_lidar = torch.from_numpy(gt_lidar)
                 gt_boxes.append(gt_lidar)
+                gt_box_2d = torch.from_numpy(gt_box_2d)
+                gt_boxes_2d.append(gt_box_2d)
                 labels_gt.append(1.)
+        if gt_boxes_2d:
+            gt_boxes_2d = torch.stack(gt_boxes_2d).to('cuda')
+            gt_boxes_2d = gt_boxes_2d.squeeze(1).float()
+
+
         if gt_boxes:
             gt_boxes = torch.stack(gt_boxes).to('cuda')
             gt_boxes = gt_boxes.squeeze(1).float()
@@ -189,23 +196,31 @@ def main():
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
         # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
 
+
+        iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
+        max_iou_values_2d, max_iou_indices_2d = torch.max(iou2D, dim=1)
+        valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > 0.7]  # [1,2,0]
+        idx_selected_2d = []
+        for idx in valid_indices_2d:
+            pred_label_2d = pseudo_labels_list[idx]
+            gt_label_2d = labels_gt[max_iou_indices_2d[idx]]
+            if max_iou_indices_2d[idx] not in idx_selected_2d:
+                if pred_label_2d == gt_label_2d:
+                    all_TP_2d = all_TP_2d + 1
+                    idx_selected_2d.append(max_iou_indices_2d[idx])
+
+
         num_pre = boxes_lidar.shape[0]
         num_gt = gt_boxes.shape[0]
         all_preds = all_preds + num_pre
         all_gts = all_gts + num_gt
         # max_iou_per_pred = torch.max(iou3D, dim=1)[0]
         max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
-        # print(f"num_pre: {num_pre}  ;  num_gt: {num_gt}")
-        # print(f"max_iou_values:{max_iou_values.shape}")
         valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0.7]   # [1,2,0]
         filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
         pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
         pred_depth_and_cls_scores = [score_list.cpu().numpy()[i] for i in valid_indices]
         filtered_max_ious = [max_iou_values.cpu().numpy()[i] for i in valid_indices]
-
-
-        # print(f"pseudo_labels_list :{pseudo_labels_list}")
-        # print(f"labels_gt :{labels_gt}")
         idx_selected = []
         for idx in valid_indices:
             pred_label = pseudo_labels_list[idx]
@@ -225,11 +240,13 @@ def main():
 
     print(f"all_gts  --  {all_gts}")
     print(f"all_preds  --  {all_preds}")
-    print(f"all_TP  --  {all_TP}")
+    print(f"all_TP  --  {all_TP} -- {all_TP_2d}")
     all_FP = all_preds - all_TP
-    print(f"all_FP  --  {all_FP}")
+    all_FP_2d = all_preds - all_TP_2d
+    print(f"all_FP  --  {all_FP} -- {all_FP_2d}")
     all_FN = all_gts - all_TP
-    print(f"all_FN  --  {all_FN}")
+    all_FN_2d = all_gts - all_TP_2d
+    print(f"all_FN  --  {all_FN} -- {all_FN_2d}")
     print(len(all_depth_score))
 if __name__ == '__main__':
     main()
