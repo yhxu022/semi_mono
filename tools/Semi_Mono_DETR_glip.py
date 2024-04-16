@@ -85,7 +85,8 @@ class Semi_Mono_DETR(BaseModel):
         self.unlabeled_set = unlabeled_set
         self.use_glip = cfg.get("use_glip", True)
         if self.use_glip:
-            print("------USE GLIP TO HELP------")
+            self.IOU_thr = cfg["semi_train_cfg"].get("IOU_thr", 0.5)
+            print(F"------USE GLIP TO HELP-- IOU THR{self.IOU_thr}----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
