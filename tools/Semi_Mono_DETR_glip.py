@@ -514,14 +514,18 @@ class Semi_Mono_DETR(BaseModel):
             # print(mask.shape)
             dets = dets[mask]
             mask_from_glip = np.zeros((len(dets[:, 0])), dtype=bool)
+
+            # print(f'all: {len(dets[:, 0])}')
             if batch_inputs is not None:
                 bboxes_from_preds = dets[:, 2:6].to(torch.float32)
                 img = batch_inputs[bz]
-                boxes_from_gd, logits = self.glip_kitti.predict(img, device=img.device)
+                boxes_from_gd, logits, phrases = self.glip_kitti.predict(img, device=img.device)
                 indexes = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
-                                                       boxes_from_preds=bboxes_from_preds, IOU_thr=0.7)
-                print(indexes)
+                                                       boxes_from_preds=bboxes_from_preds,phrases=phrases, IOU_thr=0.7)
+                # print(f'indexes : {indexes}')
                 mask_from_glip[indexes] = True
+            else:
+                mask_from_glip = np.ones((len(dets[:, 0])), dtype=bool)
 
             dets = dets[mask_from_glip]
             pseudo_labels_list.append(dets[:, 0])

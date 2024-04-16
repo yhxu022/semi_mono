@@ -64,7 +64,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(4,5))     # 3712 3769 14940 40404  (4,5)->id=
+    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  (4,5)->id=
     # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,
@@ -98,7 +98,8 @@ def main():
     all_depth_score = []
     all_pred_depth_and_cls_scores = []
     i = 0
-    for inputs, calib, targets, info in tqdm(loader):
+    progress_bar = tqdm(loader)
+    for inputs, calib, targets, info in progress_bar:
         # if i % 500 == 0:
         #     print(f'all_TP : {all_TP}')
         # i = i + 1
@@ -218,6 +219,9 @@ def main():
         all_max_ious.extend(filtered_max_ious)
         all_depth_score.extend(pred_depth_scores)
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
+        description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP}"
+        progress_bar.set_description(description)
+
 
     print(f"all_gts  --  {all_gts}")
     print(f"all_preds  --  {all_preds}")
