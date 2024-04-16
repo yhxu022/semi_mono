@@ -7,7 +7,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
-from groundingdino.util.inference import load_model, load_image, predict, annotate,predict_with_tokenized,preprocess_caption
+from groundingdino.util.inference import load_model, load_image, predict, annotate,preprocess_caption
 import cv2
 from utils.iou2d_utils import bbox_iou
 from torchvision.ops import box_convert
@@ -139,8 +139,8 @@ class Glip_Kitti(object):
         if self.device is None:
             self.device = device
             print('LOADING Grounding DINO......')
-            self.model = load_model("thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
-                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
+            self.model = load_model("/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
+                       "/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
             self.model = self.model.to(device)
             print('LOADING OVER')
             tokenizer = self.model.tokenizer
