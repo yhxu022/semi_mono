@@ -65,7 +65,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(10))     # 3712 3769 14940 40404  (4,5)->id=
+    subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  (4,5)->id=
     # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,
