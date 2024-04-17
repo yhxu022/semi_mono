@@ -4,8 +4,8 @@ import cv2
 #SwinT
 #model = load_model("/data/ipad_3d/monocular/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py", "/data/ipad_3d/monocular/GroundingDINO/weights/groundingdino_swint_ogc.pth")
 #SwinB
-model = load_model("thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
-                   "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
+model = load_model("/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/config/GroundingDINO_SwinB_cfg.py",
+                   "/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth")
 IMAGE_PATH = "/home/xyh/MonoDETR_ori/data/KITTI/training/image_2/000052.png"
 TEXT_PROMPT = "van . car . truck ."
 BOX_TRESHOLD = 0.35

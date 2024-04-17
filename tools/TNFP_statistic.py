@@ -30,7 +30,8 @@ from torch.utils.data import Subset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
-from utils.iou2d_utils import bbox_iou
+# from utils.iou2d_utils import bbox_iou
+from utils.box_ops import box_iou
 
 """
 有没有可能时分类分数的伪标签不能反应教师预测的包围盒的质量，可以试试统计下预训练模型的依据分类分数筛选的boxes和gt的iou与该boxes的分类分数是不是正比，做一个散点图看看
@@ -64,7 +65,7 @@ def main():
     print("start statistics:")
     print(f"loading from {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
-    subset = Subset(unlabeled_dataset, range(20))     # 3712 3769 14940 40404  (4,5)->id=
+    subset = Subset(unlabeled_dataset, range(10))     # 3712 3769 14940 40404  (4,5)->id=
     # subset = Subset(unlabeled_dataset, range(100))
     loader = DataLoader(dataset=subset,
                         batch_size=1,
@@ -196,8 +197,8 @@ def main():
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
         # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
 
-
-        iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
+        iou2D = box_iou(boxes_2d_from_model, gt_boxes_2d)
+        # iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
         max_iou_values_2d, max_iou_indices_2d = torch.max(iou2D, dim=1)
         valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > 0.7]  # [1,2,0]
         idx_selected_2d = []
