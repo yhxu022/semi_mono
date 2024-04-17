@@ -9,7 +9,8 @@ ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
 from groundingdino.util.inference import load_model, load_image, predict, annotate,preprocess_caption
 import cv2
-from utils.iou2d_utils import bbox_iou
+#from utils.iou2d_utils import bbox_iou
+from utils.box_ops import box_iou
 from torchvision.ops import box_convert
 from groundingdino.models.GroundingDINO.bertwarper import (
     BertModelWarper,
@@ -247,7 +248,8 @@ class Glip_Kitti(object):
             return []
 
 
-        IOUs = bbox_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
+        # IOUs = bbox_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
+        IOUs,_ = box_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
         max_iou, max_indices = torch.max(IOUs, dim=1)
         preds_indexes = torch.where(max_iou > IOU_thr)[0]
         glip_indexes = max_indices[preds_indexes]

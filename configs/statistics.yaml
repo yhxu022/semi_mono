@@ -32,7 +32,7 @@ semi_train_cfg:
   sup_size: 0
   freeze_teacher: True # 冻结教师
   topk: 50
-  cls_pseudo_thr: 0.05 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.1 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
   cls_clip_thr: 0.5 # 用于分类的clip阈值
   IOU_thr: 0.7
@@ -121,5 +121,5 @@ tester:
   type: *dataset_type
   mode: single  # 'single' or 'all'; 'all' to evaluate all ckpts in the folder
   checkpoint: 195  # the start ckpt epoch for 'all'
-  threshold: 0.05  # confidence filter
+  threshold: 0.1  # confidence filter
   topk: 50
