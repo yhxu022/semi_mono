@@ -235,7 +235,7 @@ def main():
         all_max_ious.extend(filtered_max_ious)
         all_depth_score.extend(pred_depth_scores)
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
-        description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP}"
+        description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
         progress_bar.set_description(description)
 
 
