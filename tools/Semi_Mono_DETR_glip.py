@@ -534,10 +534,7 @@ class Semi_Mono_DETR(BaseModel):
             if len(dets) > 0:
                 scores = dets[:, 1]
             dets = dets.unsqueeze(0)
-            if self.pseudo_label_group_num > 1:
-                device = dets.device
-            else:
-                device = 'cpu'
+            device = dets.device
             dets = dets.detach().cpu().numpy()
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
