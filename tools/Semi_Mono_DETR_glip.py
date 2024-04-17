@@ -577,12 +577,6 @@ class Semi_Mono_DETR(BaseModel):
         scores_list = torch.tensor(scores_list)
         scores_list = torch.squeeze(scores_list, dim=0)
         # pseudo_labels_list = torch.tensor(pseudo_labels_list)
-        if boxes_2d is not None:
-            w = 1280
-            h = 384
-            size = torch.tensor([w, h, w, h],device=device)
-            boxes_2d =boxes_2d * size
-
         return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d
         # return boxes_lidar, score_list, loc, prob_from_glip, scores_list, pseudo_labels_list
 

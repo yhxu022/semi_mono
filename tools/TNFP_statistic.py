@@ -197,7 +197,7 @@ def main():
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
         # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
 
-        iou2D = box_iou(boxes_2d_from_model, gt_boxes_2d)
+        iou2D,_= box_iou(boxes_2d_from_model, gt_boxes_2d)
         # iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
         max_iou_values_2d, max_iou_indices_2d = torch.max(iou2D, dim=1)
         valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > 0.7]  # [1,2,0]
