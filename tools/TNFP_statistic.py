@@ -69,7 +69,7 @@ def main():
         # 创建新的文件夹
             os.mkdir('outputs_visual')
     checkpoint = cfg["trainer"].get("pretrain_model", None)
-
+    IOU_thr_glip =  cfg["semi_train_cfg"].get("IOU_thr", 0.7)
     print("start statistics:")
     print(f"loading from CONFIG {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
@@ -328,7 +328,8 @@ def main():
             cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
             if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
                 cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
-		
+
+
     print(f"all_gts  --  {all_gts}")
     print(f"all_preds  --  {all_preds}")
     print(f"all_TP  --  {all_TP} -- all_TP_2d  --   {all_TP_2d}")
