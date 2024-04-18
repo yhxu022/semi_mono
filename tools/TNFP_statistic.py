@@ -60,9 +60,9 @@ def main():
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     save_dir = "statistics"
-	save_TNFP_dir = 'TNFP'
+    save_TNFP_dir = 'TNFP'
     os.makedirs(save_dir, exist_ok=True)
-	os.makedirs(save_TNFP_dir, exist_ok=True)
+    os.makedirs(save_TNFP_dir, exist_ok=True)
     if cfg.get("visualize",False):
         # 检查文件夹是否已经存在
         if not os.path.exists('outputs_visual'):
@@ -112,7 +112,7 @@ def main():
         FP_pic = 0
         FN_pic = 0
         wrong_labels = []
-		input_teacher = inputs[1]
+        input_teacher = inputs[1]
         input_teacher = input_teacher.to("cuda")
         calib = calib.to("cuda")
         id = int(info['img_id'])
@@ -267,9 +267,9 @@ def main():
             if max_iou_indices_2d[idx] not in idx_selected_2d:
                 if pred_label_2d == gt_label_2d:
                     all_TP_2d = all_TP_2d + 1
-					TP_pic = TP_pic + 1
+                    TP_pic = TP_pic + 1
                     idx_selected_2d.append(max_iou_indices_2d[idx])
-				else:
+                else:
                     wrong_labels.append(pred_label_2d)
 
 
@@ -299,11 +299,12 @@ def main():
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
         description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
         progress_bar.set_description(description)
-		PRED_pic = num_pre
+        PRED_pic = num_pre
         GT_pic = num_gt
         FP_pic = num_pre - TP_pic
         FN_pic = num_gt - TP_pic
-		filename = f"{save_TNFP_dir}/TNFP_in_one_picture_IOU_{IOU_thr_glip}.txt"
+        IOU_thr_glip=cfg["semi_train_cfg"].get("IOU_thr", 0.5)
+        filename = f"{save_TNFP_dir}/TNFP_in_one_picture_IOU_{IOU_thr_glip}.txt"
         with open(filename, "a") as file:
             file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}\n")
 

@@ -228,8 +228,8 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-
-        return boxes, logits, phrases
+        mask_class=phrases=="car"
+        return boxes[mask_class], logits[mask_class], phrases[mask_class]
 
     def analyze_pred_result(self, boxes_from_glip, boxes_from_preds, phrases, IOU_thr=0.7):
         w = 1280
