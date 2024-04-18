@@ -140,8 +140,8 @@ class Glip_Kitti(object):
         if self.device is None:
             self.device = device
             print('LOADING Grounding DINO......')
-            self.model = load_model("/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
-                       "/data/ipad_3d/monocular/semi_mono/thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
+            self.model = load_model("thirdparty/GroundingDINO/groundingdino/config/GroundingDINO_SwinB_cfg.py",
+                       "thirdparty/GroundingDINO/weights/groundingdino_swinb_cogcoor.pth",device=device)
             self.model = self.model.to(device)
             print('LOADING OVER')
             tokenizer = self.model.tokenizer
