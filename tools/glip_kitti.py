@@ -228,8 +228,14 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-        mask_class=phrases=="car"
-        return boxes[mask_class], logits[mask_class], phrases[mask_class]
+        mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        if len(mask_class.shape) == 0:
+            mask_class = mask_class.unsqueeze(0)
+        boxes_filtered = boxes[mask_class, :]
+        logits_filtered = logits[mask_class, :]
+        phrases_filtered = [phrases[i] for i in mask_class]
+        return boxes_filtered, logits_filtered, phrases_filtered
+
 
     def analyze_pred_result(self, boxes_from_glip, boxes_from_preds, phrases, IOU_thr=0.7):
         w = 1280
@@ -249,11 +255,15 @@ class Glip_Kitti(object):
         mask_height_glip=bbox_from_glip_orisize[:,-1]>=25
         mask_height_preds=bbox_from_preds_orisize[:,-1]>=25
         bbox_from_glip_orisize_height_filtered=bbox_from_glip_orisize[mask_height_glip]
+        mask_height_glip=mask_height_glip.nonzero(as_tuple=False).squeeze()
+        if len(mask_height_glip.shape) == 0:
+            mask_height_glip = mask_height_glip.unsqueeze(0)
+        phrases = [phrases[i] for i in mask_height_glip]
         bbox_from_preds_orisize_height_filtered=bbox_from_preds_orisize[mask_height_preds]
         if len(bbox_from_glip_orisize_height_filtered) == 0 or len(bbox_from_preds_orisize_height_filtered) == 0:
             return []
 
-        IOUs = bbox_iou(bbox_from_glip_orisize_height_filtered, bbox_from_preds_orisize_height_filtered)
+        IOUs = bbox_iou(bbox_from_preds_orisize_height_filtered,bbox_from_glip_orisize_height_filtered)
         #IOUs,_ = box_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
         max_iou, max_indices = torch.max(IOUs, dim=1)
         preds_indexes = torch.where(max_iou > IOU_thr)[0]
