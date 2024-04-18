@@ -288,7 +288,7 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
@@ -305,7 +305,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
                     info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
-            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d
+            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -577,7 +577,7 @@ class Semi_Mono_DETR(BaseModel):
         scores_list = torch.tensor(scores_list)
         scores_list = torch.squeeze(scores_list, dim=0)
         # pseudo_labels_list = torch.tensor(pseudo_labels_list)
-        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d
+        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d, dets_img
         # return boxes_lidar, score_list, loc, prob_from_glip, scores_list, pseudo_labels_list
 
     # score_list：分类分    depth_score_list：深度分    scores_list：分类分和深度分相乘

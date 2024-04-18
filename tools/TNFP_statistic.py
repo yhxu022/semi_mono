@@ -1,6 +1,7 @@
 
 import warnings
 
+import cv2
 import numpy as np
 
 warnings.filterwarnings("ignore")
@@ -32,7 +33,8 @@ import matplotlib.pyplot as plt
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
 # from utils.iou2d_utils import bbox_iou
 from utils.box_ops import box_iou
-
+from visual.Object_pred import Object3d_pred
+from visual.kitti_object import show_image_with_boxes, show_lidar_topview_with_boxes
 """
 有没有可能时分类分数的伪标签不能反应教师预测的包围盒的质量，可以试试统计下预训练模型的依据分类分数筛选的boxes和gt的iou与该boxes的分类分数是不是正比，做一个散点图看看
 只用统计val上的就行，正好有gt在
@@ -59,7 +61,11 @@ def main():
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     save_dir = "statistics"
     os.makedirs(save_dir, exist_ok=True)
-
+    if cfg.get("visualize",False):
+        # 检查文件夹是否已经存在
+        if not os.path.exists('outputs_visual'):
+        # 创建新的文件夹
+            os.mkdir('outputs_visual')
     checkpoint = cfg["trainer"].get("pretrain_model", None)
 
     print("start statistics:")
@@ -109,14 +115,19 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model = \
+        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
         gts = []
         labels_gt = []
         labels_pred = pseudo_labels_list
-
+        if cfg.get("visualize",False):
+            img = subset.dataset.get_image(id)
+            img_from_file = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            calibs_from_file = subset.dataset.get_calib(id)
+            pc_velo = subset.dataset.get_lidar(id)
+        
         for i in range(len(gt_objects)):
             # filter objects by writelist
             if gt_objects[i].cls_type not in subset.dataset.writelist:
@@ -184,6 +195,28 @@ def main():
             else:
                 num_pre = boxes_lidar.shape[0]
             all_preds = all_preds + num_pre
+            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
+            progress_bar.set_description(description)
+            if cfg.get("visualize",False):
+                objects = []
+                for det in dets_img:
+                    object = Object3d_pred(det.detach().cpu().numpy())
+                    objects.append(object)
+                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
+                img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
+                if (cfg["dataset"]["inference_split"] in ['test']):
+                    img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
+                if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+                    img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
+                                                    mode="2D")
+                    img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
+                                                    mode="3D")
+                    img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
+                                                            objects_pred=objects)
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+                if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
+                    cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
             continue
         if boxes_lidar is None:
             # 预测为0 ， gt不是0
@@ -191,6 +224,28 @@ def main():
             num_gt = gt_boxes.shape[0]
             all_preds = all_preds + num_pre
             all_gts = all_gts + num_gt
+            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
+            progress_bar.set_description(description)
+            if cfg.get("visualize",False):
+                objects = []
+                for det in dets_img:
+                    object = Object3d_pred(det.detach().cpu().numpy())
+                    objects.append(object)
+                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
+                img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
+                if (cfg["dataset"]["inference_split"] in ['test']):
+                    img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
+                if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+                    img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
+                                                    mode="2D")
+                    img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
+                                                    mode="3D")
+                    img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
+                                                            objects_pred=objects)
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+                if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
+                    cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
             continue
 
         boxes_lidar = boxes_lidar.float().to('cuda')
@@ -237,6 +292,26 @@ def main():
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
         description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
         progress_bar.set_description(description)
+        if cfg.get("visualize",False):
+            objects = []
+            for det in dets_img:
+                object = Object3d_pred(det.detach().cpu().numpy())
+                objects.append(object)
+            img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
+            img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
+            if (cfg["dataset"]["inference_split"] in ['test']):
+                img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
+            if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
+                img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
+                                                mode="2D")
+                img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
+                                                mode="3D")
+                img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
+                                                        objects_pred=objects)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
+            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
+            if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
 
 
     print(f"all_gts  --  {all_gts}")
