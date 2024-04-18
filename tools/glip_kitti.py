@@ -246,9 +246,14 @@ class Glip_Kitti(object):
         bbox_from_preds_orisize = boxes_from_preds * size
         if len(bbox_from_glip_orisize) == 0 or len(bbox_from_preds_orisize) == 0:
             return []
+        mask_height_glip=bbox_from_glip_orisize[:,-1]>=25
+        mask_height_preds=bbox_from_preds_orisize[:,-1]>=25
+        bbox_from_glip_orisize_height_filtered=bbox_from_glip_orisize[mask_height_glip]
+        bbox_from_preds_orisize_height_filtered=bbox_from_preds_orisize[mask_height_preds]
+        if len(bbox_from_glip_orisize_height_filtered) == 0 or len(bbox_from_preds_orisize_height_filtered) == 0:
+            return []
 
-
-        IOUs = bbox_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
+        IOUs = bbox_iou(bbox_from_glip_orisize_height_filtered, bbox_from_preds_orisize_height_filtered)
         #IOUs,_ = box_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
         max_iou, max_indices = torch.max(IOUs, dim=1)
         preds_indexes = torch.where(max_iou > IOU_thr)[0]

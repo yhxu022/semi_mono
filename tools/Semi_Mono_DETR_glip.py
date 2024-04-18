@@ -489,6 +489,7 @@ class Semi_Mono_DETR(BaseModel):
         prob_from_glip = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
+            crop_scale_bz=info["crop_scale"][bz]
             dets = batch_dets[bz]
             calib = batch_calibs[bz]
             # target=batch_targets[bz]
@@ -497,6 +498,7 @@ class Semi_Mono_DETR(BaseModel):
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_depth = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -509,9 +511,13 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
+                depth= dets[i, 6]/crop_scale_bz
+                # ignore the samples beyond the threshold [hard encoding]
+                threshold = 65
+                if depth >=2 and depth <=threshold:
+                    mask_depth[i] = True
 
-
-            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
+            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr & mask_depth
             # print(mask.shape)
             dets = dets[mask]
             mask_from_glip = np.zeros((len(dets[:, 0])), dtype=bool)
@@ -520,7 +526,7 @@ class Semi_Mono_DETR(BaseModel):
             if batch_inputs is not None:
                 bboxes_from_preds = dets[:, 2:6].to(torch.float32)
                 img = batch_inputs[bz]
-                print(img.shape)
+                #print(img.shape)
                 boxes_from_gd, logits, phrases = self.glip_kitti.predict(img, device=img.device)
                 indexes = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
                                                        boxes_from_preds=bboxes_from_preds,phrases=phrases, IOU_thr=0.7)

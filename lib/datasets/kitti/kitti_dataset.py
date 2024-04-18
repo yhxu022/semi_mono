@@ -365,6 +365,7 @@ class KITTI_Dataset(data.Dataset):
                     mask_2d[i] = 1
 
                 calibs[i] = calib.P2
+                
 
         # collect return data
         inputs = img, img
@@ -392,7 +393,8 @@ class KITTI_Dataset(data.Dataset):
 
         info = {'img_id': index,
                 'img_size': img_size,
-                'bbox_downsample_ratio': img_size / features_size}
+                'bbox_downsample_ratio': img_size / features_size,
+                "crop_scale":crop_scale}
         return inputs, calib.P2, targets, info
 
 
