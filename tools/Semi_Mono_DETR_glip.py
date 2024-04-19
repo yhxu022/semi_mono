@@ -89,6 +89,7 @@ class Semi_Mono_DETR(BaseModel):
             print(F"------USE GLIP TO HELP-- IOU THR: {self.IOU_thr}----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
         self.depth_filter = cfg["semi_train_cfg"].get('depth_filter', False)
+        self.height_filter = cfg["semi_train_cfg"].get('height_filter', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -504,6 +505,7 @@ class Semi_Mono_DETR(BaseModel):
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_height = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -524,7 +526,13 @@ class Semi_Mono_DETR(BaseModel):
                         mask_depth[i] = True
                 else:
                     mask_depth[i] = True
-            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr & mask_depth
+                if self.height_filter==True:
+                    h = dets[i, 5]*384
+                    if h >=25:
+                        mask_height[i] = True
+                else:
+                    mask_height[i] = True
+            mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr & mask_depth & mask_height
             # print(mask.shape)
             dets = dets[mask]
             mask_from_glip = np.zeros((len(dets[:, 0])), dtype=bool)

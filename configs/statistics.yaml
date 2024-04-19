@@ -37,7 +37,8 @@ semi_train_cfg:
   cls_pseudo_thr: 0.05 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
   cls_clip_thr: 0.5 # 用于分类的clip阈值
-  depth_filter: False
+  depth_filter: True
+  height_filter: True
   IOU_thr: 0.7
   depth_score_thr: 0
   pseudo_label_group_num: 1
