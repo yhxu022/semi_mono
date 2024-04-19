@@ -34,7 +34,8 @@ class Glip_Kitti(object):
     def __init__(self):
         self.device = None
         self.TEXT_PROMPT = "Van . Car . Truck ."
-        self.phrases_list = [word.strip('.').lower() for word in self.TEXT_PROMPT.split()]
+        self.phrases_list = [word.strip().lower() for word in self.TEXT_PROMPT.split('.')]
+        self.phrases_list = [word for word in self.phrases_list if word]
         self.BOX_TRESHOLD = 0.35
         self.TEXT_TRESHOLD = 0.25
         self.tokenized = None
@@ -229,8 +230,8 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-        # mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
-        mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        # mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
 
         if len(mask_class.shape) == 0:
             mask_class = mask_class.unsqueeze(0)
@@ -254,7 +255,7 @@ class Glip_Kitti(object):
         bbox_from_glip_orisize = boxes_from_glip * size
         bbox_from_preds_orisize = boxes_from_preds * size
         if len(bbox_from_glip_orisize) == 0 or len(bbox_from_preds_orisize) == 0:
-            return []
+            return [],[]
         mask_height_glip=bbox_from_glip_orisize[:,-1]>=25
         mask_height_preds=bbox_from_preds_orisize[:,-1]>=25
         bbox_from_glip_orisize_height_filtered=bbox_from_glip_orisize[mask_height_glip]

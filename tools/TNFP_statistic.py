@@ -24,7 +24,7 @@ import argparse
 from tools.semi_base3d_glip import SemiBase3DDetector
 # from tools.semi_base3d_clip import SemiBase3DDetector
 # from tools.semi_base3d import SemiBase3DDetector
-
+import datetime
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
 from torch.utils.data import DataLoader
 from torch.utils.data import Subset
@@ -71,7 +71,8 @@ def main():
     checkpoint = cfg["trainer"].get("pretrain_model", None)
     IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
     cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.7)
-    print(f"start statistics: IOU_{IOU_thr_glip}_clsthr_{cls_thr}   ")
+    time_now = datetime.datetime.now().strftime('%m%d%H_%M')
+    print(f"start statistics:   IOU: {IOU_thr_glip}   clsthr: {cls_thr}")
     print(f"loading from CONFIG {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
     subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  (4,5)->id=
@@ -83,6 +84,7 @@ def main():
                         pin_memory=True,
                         drop_last=False,
                         persistent_workers=True)
+
     model = SemiBase3DDetector\
         (cfg, cfg['model'], loader, cfg["semi_train_cfg"], cfg["semi_test_cfg"], inference_set=subset.dataset).to('cuda')
     # if checkpoint is not None:
@@ -304,7 +306,7 @@ def main():
         GT_pic = num_gt
         FP_pic = num_pre - TP_pic
         FN_pic = num_gt - TP_pic
-        filename = f"{save_TNFP_dir}/TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
+        filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
         with open(filename, "a") as file:
             file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}   phrases2{phrases2}\n")
 

@@ -528,7 +528,7 @@ class Semi_Mono_DETR(BaseModel):
                 img = batch_inputs[bz]
                 #print(img.shape)
                 boxes_from_gd, logits, phrases = self.glip_kitti.predict(img, device=img.device)
-                indexes,phrases2 = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
+                indexes, phrases2 = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
                                                        boxes_from_preds=bboxes_from_preds,phrases=phrases, IOU_thr=self.cfg["semi_train_cfg"].get("IOU_thr", 0.7))
                 # print(f'indexes : {indexes}')
                 mask_from_glip[indexes] = True
