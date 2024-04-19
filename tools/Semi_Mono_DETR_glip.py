@@ -88,6 +88,7 @@ class Semi_Mono_DETR(BaseModel):
             self.IOU_thr = cfg["semi_train_cfg"].get("IOU_thr", 0.5)
             print(F"------USE GLIP TO HELP-- IOU THR: {self.IOU_thr}----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
+        self.depth_filter = cfg["semi_train_cfg"].get('depth_filter', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -515,12 +516,14 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
-                depth= dets[i, 6]/crop_scale_bz
-                # ignore the samples beyond the threshold [hard encoding]
-                threshold = 65
-                if depth >=2 and depth <=threshold:
+                if self.depth_filter==True:
+                    depth= dets[i, 6]/crop_scale_bz
+                    # ignore the samples beyond the threshold [hard encoding]
+                    threshold = 65
+                    if depth >=2 and depth <=threshold:
+                        mask_depth[i] = True
+                else:
                     mask_depth[i] = True
-
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr & mask_depth
             # print(mask.shape)
             dets = dets[mask]

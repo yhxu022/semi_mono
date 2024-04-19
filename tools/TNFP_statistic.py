@@ -62,6 +62,8 @@ def main():
     save_dir = "statistics"
     time_now = datetime.datetime.now().strftime('%m%d%H_%M')
     save_TNFP_dir = 'TNFP'
+    IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
+    cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.5)
     filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(save_TNFP_dir, exist_ok=True)
