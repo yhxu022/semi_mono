@@ -109,7 +109,7 @@ class SemiBase3DDetector(BaseModel):
         self.depth_qfl = QualityFocalLoss(use_sigmoid=True, beta=2.0, reduction='mean', \
                                           loss_weight=self.semi_train_cfg.get('depth_map_consistency_loss_weight', 0.0), \
                                           activated=False)
-        self.teacher.glip_kitti = Glip_Kitti()
+        self.teacher.glip_kitti = Glip_Kitti(box_threshold=self.semi_train_cfg.get('glip_box_threshold', 0.35),text_threshold=self.semi_train_cfg.get('glip_box_threshold', 0.35))
         self.decouple = self.semi_train_cfg.get('decouple', False)
         self.cls_losses = self.semi_train_cfg.get('cls_losses', ['labels'])
         self.regression_losses = self.semi_train_cfg.get('regression_losses', ['boxes', 'dims', 'angles'])

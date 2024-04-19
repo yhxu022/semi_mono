@@ -31,13 +31,13 @@ from groundingdino.util.misc import (
 )
 
 class Glip_Kitti(object):
-    def __init__(self):
+    def __init__(self,box_threshold=0.35,text_threshold=0.25):
         self.device = None
         self.TEXT_PROMPT = "Van . Car . Truck ."
         self.phrases_list = [word.strip().lower() for word in self.TEXT_PROMPT.split('.')]
         self.phrases_list = [word for word in self.phrases_list if word]
-        self.BOX_TRESHOLD = 0.35
-        self.TEXT_TRESHOLD = 0.25
+        self.BOX_TRESHOLD = box_threshold
+        self.TEXT_TRESHOLD = text_threshold
         self.tokenized = None
 
         print(f"{len(set(self.TEXT_PROMPT.replace('.', '').split()))} classes")
