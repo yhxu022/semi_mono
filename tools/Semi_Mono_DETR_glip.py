@@ -299,13 +299,13 @@ class Semi_Mono_DETR(BaseModel):
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d, dets_img = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
                     info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
-            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img
+            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d, dets_img
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -529,7 +529,7 @@ class Semi_Mono_DETR(BaseModel):
                 #print(img.shape)
                 boxes_from_gd, logits, phrases = self.glip_kitti.predict(img, device=img.device)
                 indexes = self.glip_kitti.analyze_pred_result(boxes_from_glip=boxes_from_gd,
-                                                       boxes_from_preds=bboxes_from_preds,phrases=phrases, IOU_thr=0.7)
+                                                       boxes_from_preds=bboxes_from_preds,phrases=phrases, IOU_thr=self.cfg["semi_train_cfg"].get("IOU_thr", 0.7))
                 # print(f'indexes : {indexes}')
                 mask_from_glip[indexes] = True
             else:
