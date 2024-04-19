@@ -71,7 +71,7 @@ def main():
     checkpoint = cfg["trainer"].get("pretrain_model", None)
     IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
     cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.7)
-    print("start statistics:")
+    print(f"start statistics: IOU_{IOU_thr_glip}_clsthr_{cls_thr}   ")
     print(f"loading from CONFIG {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
     subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  (4,5)->id=
@@ -120,7 +120,7 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
+        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
@@ -306,7 +306,7 @@ def main():
         FN_pic = num_gt - TP_pic
         filename = f"{save_TNFP_dir}/TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
         with open(filename, "a") as file:
-            file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}\n")
+            file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}   phrases2{phrases2}\n")
 
         if cfg.get("visualize",False):
             objects = []

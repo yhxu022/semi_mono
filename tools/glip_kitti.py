@@ -34,12 +34,13 @@ class Glip_Kitti(object):
     def __init__(self):
         self.device = None
         self.TEXT_PROMPT = "Van . Car . Truck ."
+        self.phrases_list = [word.strip('.').lower() for word in self.TEXT_PROMPT.split()]
         self.BOX_TRESHOLD = 0.35
         self.TEXT_TRESHOLD = 0.25
         self.tokenized = None
 
         print(f"{len(set(self.TEXT_PROMPT.replace('.', '').split()))} classes")
-
+        print(f"{self.phrases_list}")
     def forward_with_tokenized(self, model, samples, targets, **kw):
 
         bert_output = self.bert_output
@@ -228,7 +229,9 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-        mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        # mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+
         if len(mask_class.shape) == 0:
             mask_class = mask_class.unsqueeze(0)
         boxes_filtered = boxes[mask_class, :]
@@ -260,8 +263,9 @@ class Glip_Kitti(object):
             mask_height_glip = mask_height_glip.unsqueeze(0)
         phrases = [phrases[i] for i in mask_height_glip]
         bbox_from_preds_orisize_height_filtered=bbox_from_preds_orisize[mask_height_preds]
+        preds_indexes_filtered = []
         if len(bbox_from_glip_orisize_height_filtered) == 0 or len(bbox_from_preds_orisize_height_filtered) == 0:
-            return []
+            return preds_indexes_filtered,phrases
 
         IOUs = bbox_iou(bbox_from_preds_orisize_height_filtered,bbox_from_glip_orisize_height_filtered)
         #IOUs,_ = box_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
@@ -269,19 +273,19 @@ class Glip_Kitti(object):
         preds_indexes = torch.where(max_iou > IOU_thr)[0]
         glip_indexes = max_indices[preds_indexes]
 
-        preds_indexes_filtered=[]
+
         idx_selected = []
         # print(phrases)
         for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
             if max_indices[pred_idx] not in idx_selected:
-                if phrases[glip_idx] == 'car':
-                    preds_indexes_filtered.append(pred_idx.item())
-                    idx_selected.append(max_indices[pred_idx])
+                # if phrases[glip_idx] == 'car':
+                preds_indexes_filtered.append(pred_idx.item())
+                idx_selected.append(max_indices[pred_idx])
 
         # preds_indexes_filtered = [pred_idx.item() for pred_idx, glip_idx in zip(preds_indexes, glip_indexes) if
         #                           phrases[glip_idx] == 'car']
 
-        return preds_indexes_filtered
+        return preds_indexes_filtered, phrases
 
 
 if __name__ == "__main__":
