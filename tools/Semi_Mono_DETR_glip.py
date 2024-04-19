@@ -285,6 +285,10 @@ class Semi_Mono_DETR(BaseModel):
         elif mode == 'statistics':
             img_sizes = info['img_size']
             outputs = self.model(inputs, calibs, img_sizes, dn_args=0)
+            if self.use_glip is True:
+                glip_inputs = inputs
+            else:
+                glip_inputs = None
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
@@ -293,7 +297,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
+                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -304,7 +308,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info, batch_inputs=inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
+                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d, dets_img, phrases2
 
     def prepare_targets(self, targets, batch_size):
@@ -533,6 +537,7 @@ class Semi_Mono_DETR(BaseModel):
                 # print(f'indexes : {indexes}')
                 mask_from_glip[indexes] = True
             else:
+                phrases2=None
                 mask_from_glip = np.ones((len(dets[:, 0])), dtype=bool)
 
             dets = dets[mask_from_glip]
