@@ -60,7 +60,9 @@ def main():
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     save_dir = "statistics"
+    time_now = datetime.datetime.now().strftime('%m%d%H_%M')
     save_TNFP_dir = 'TNFP'
+    filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(save_TNFP_dir, exist_ok=True)
     if cfg.get("visualize",False):
@@ -71,7 +73,6 @@ def main():
     checkpoint = cfg["trainer"].get("pretrain_model", None)
     IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
     cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.7)
-    time_now = datetime.datetime.now().strftime('%m%d%H_%M')
     print(f"start statistics:   IOU: {IOU_thr_glip}   clsthr: {cls_thr}")
     print(f"loading from CONFIG {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
@@ -306,7 +307,6 @@ def main():
         GT_pic = num_gt
         FP_pic = num_pre - TP_pic
         FN_pic = num_gt - TP_pic
-        filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
         with open(filename, "a") as file:
             file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}   phrases2{phrases2}\n")
 
@@ -331,7 +331,7 @@ def main():
             if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
                 cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
 
-
+    print(filename)
     print(f"all_gts  --  {all_gts}")
     print(f"all_preds  --  {all_preds}")
     print(f"all_TP  --  {all_TP} -- all_TP_2d  --   {all_TP_2d}")
@@ -342,6 +342,12 @@ def main():
     all_FN_2d = all_gts - all_TP_2d
     print(f"all_FN  --  {all_FN} -- all_FN_2d  --  {all_FN_2d}")
     print(len(all_depth_score))
+    with open(filename, "a") as file:
+        file.write(f"Total: all_gts  --  {all_gts}     all_preds  --  {all_preds}")
+        file.write(f"all_TP - -  {all_TP} - - all_TP_2d - -   {all_TP_2d}")
+        file.write(f"all_FP  --  {all_FP} -- all_FP_2d  --  {all_FP_2d}")
+        file.write(f"all_FN  --  {all_FN} -- all_FN_2d  --  {all_FN_2d}")
+
 
 if __name__ == '__main__':
     main()
