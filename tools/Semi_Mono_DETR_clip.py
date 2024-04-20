@@ -82,8 +82,11 @@ class Semi_Mono_DETR(BaseModel):
         self.unlabeled_set = unlabeled_set
         self.use_clip = cfg.get("use_clip", True)
         if self.use_clip:
-            print("------USE CLIP TO HELP------")
+            self.cls_clip_thr = cfg["semi_train_cfg"].get("cls_clip_thr", 0.0)
+            print(f"------USE CLIP TO HELP----- CLIP CLS THR: {self.cls_clip_thr}----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
+        self.depth_filter = cfg["semi_train_cfg"].get('depth_filter', False)
+        self.height_filter = cfg["semi_train_cfg"].get('height_filter', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -282,24 +285,24 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cls_clip_thr)
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
-            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cls_clip_thr)
+            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -485,10 +488,13 @@ class Semi_Mono_DETR(BaseModel):
             calib = batch_calibs[bz]
             # target=batch_targets[bz]
             pseudo_labels = dets[:, 0]
+            crop_scale_bz = info["crop_scale"][bz]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_depth = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_height = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -525,6 +531,20 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
+                if self.depth_filter==True:
+                    depth= dets[i, 6]/crop_scale_bz
+                    # ignore the samples beyond the threshold [hard encoding]
+                    threshold = 65
+                    if depth >=2 and depth <=threshold:
+                        mask_depth[i] = True
+                else:
+                    mask_depth[i] = True
+                if self.height_filter==True:
+                    h = dets[i, 5]*384
+                    if h >=25:
+                        mask_height[i] = True
+                else:
+                    mask_height[i] = True
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             # print(mask.shape)
             dets = dets[mask]
@@ -532,10 +552,7 @@ class Semi_Mono_DETR(BaseModel):
             if len(dets) > 0:
                 scores = dets[:, 1]
             dets = dets.unsqueeze(0)
-            if self.pseudo_label_group_num > 1:
-                device = dets.device
-            else:
-                device = 'cpu'
+            device = dets.device
             dets = dets.detach().cpu().numpy()
             calibs = [self.inference_set.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
@@ -564,9 +581,11 @@ class Semi_Mono_DETR(BaseModel):
                 loc_lidar[:, 2] += h[:, 0] / 2
                 heading = -(torch.pi / 2 + ry)
                 boxes_lidar = torch.concatenate([loc_lidar, l, w, h, heading], axis=1)
+                boxes_2d = dets_img[:, 2:6]
                 pass
             else:
                 boxes_lidar = None
+                boxes_2d = None
                 loc = None
 
         score_list = torch.tensor(score_list)
@@ -576,7 +595,7 @@ class Semi_Mono_DETR(BaseModel):
         scores_list = torch.tensor(scores_list)
         scores_list = torch.squeeze(scores_list, dim=0)
         # pseudo_labels_list = torch.tensor(pseudo_labels_list)
-        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list
+        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d
         # return boxes_lidar, score_list, loc, prob_from_clip, scores_list, pseudo_labels_list
 
     # score_list：分类分    depth_score_list：深度分    scores_list：分类分和深度分相乘

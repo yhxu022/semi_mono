@@ -34,13 +34,15 @@ class Glip_Kitti(object):
     def __init__(self,box_threshold=0.35,text_threshold=0.25):
         self.device = None
         self.TEXT_PROMPT = "Van . Car . Truck ."
+        # self.TEXT_PROMPT = "Van . Car . Truck .Delivery Truck . Dump Truck . Semi Truck . Pickup Truck . Sedan . Saloon . SUV . Coupe . Sports Car . Luxury Car ."
         self.phrases_list = [word.strip().lower() for word in self.TEXT_PROMPT.split('.')]
         self.phrases_list = [word for word in self.phrases_list if word]
         self.BOX_TRESHOLD = box_threshold
         self.TEXT_TRESHOLD = text_threshold
+        self.mode = 'glip' # 'glip' or 'pred'
         self.tokenized = None
 
-        print(f"{len(set(self.TEXT_PROMPT.replace('.', '').split()))} classes")
+        print(f"{len(set(self.TEXT_PROMPT.replace('.', '').split()))} classes; mode = {self.mode}")
         print(f"{self.phrases_list}")
     def forward_with_tokenized(self, model, samples, targets, **kw):
 
@@ -230,8 +232,8 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-        mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
-        # mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        # mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
 
         if len(mask_class.shape) == 0:
             mask_class = mask_class.unsqueeze(0)
@@ -240,6 +242,31 @@ class Glip_Kitti(object):
         phrases_filtered = [phrases[i] for i in mask_class]
         return boxes_filtered, logits_filtered, phrases_filtered
 
+    def preds_indexes_by_IOU(self,IOUs, IOU_thr,mode="pred"):
+        preds_indexes_filtered=[]
+        idx_selected=[]
+        if mode is 'pred':
+            max_iou, max_indices = torch.max(IOUs, dim=1)
+            preds_indexes = torch.where(max_iou > IOU_thr)[0]
+            glip_indexes = max_indices[preds_indexes]
+            # print(phrases)
+            for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
+                if max_indices[pred_idx] not in idx_selected:
+                    # if phrases[glip_idx] == 'car':
+                    preds_indexes_filtered.append(pred_idx.item())
+                    idx_selected.append(max_indices[pred_idx])
+
+        elif mode is 'glip':
+            max_iou, max_indices = torch.max(IOUs, dim=0)  # 注意这里的维度变为dim=0，意味着沿着bbox_from_preds的方向找最大值
+            glip_indexes = torch.where(max_iou > IOU_thr)[0]
+            preds_indexes = max_indices[glip_indexes]
+            for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
+                if pred_idx.item() not in idx_selected:
+                    # if phrases[glip_idx] == 'car':
+                        preds_indexes_filtered.append(pred_idx.item())
+                        # glip_indexes_filtered.append(glip_idx.item())
+                        idx_selected.append(pred_idx.item())
+        return preds_indexes_filtered, idx_selected
 
     def analyze_pred_result(self, boxes_from_glip, boxes_from_preds, phrases, IOU_thr=0.7):
         w = 1280
@@ -270,23 +297,16 @@ class Glip_Kitti(object):
 
         IOUs = bbox_iou(bbox_from_preds_orisize_height_filtered,bbox_from_glip_orisize_height_filtered)
         #IOUs,_ = box_iou(bbox_from_preds_orisize, bbox_from_glip_orisize)
-        max_iou, max_indices = torch.max(IOUs, dim=1)
-        preds_indexes = torch.where(max_iou > IOU_thr)[0]
-        glip_indexes = max_indices[preds_indexes]
 
-
-        idx_selected = []
-        # print(phrases)
-        for pred_idx, glip_idx in zip(preds_indexes, glip_indexes):
-            if max_indices[pred_idx] not in idx_selected:
-                # if phrases[glip_idx] == 'car':
-                preds_indexes_filtered.append(pred_idx.item())
-                idx_selected.append(max_indices[pred_idx])
+        # preds_indexes_filtered, idx_selected = self.preds_indexes_by_IOU(IOUs, IOU_thr,mode='pred')
+        preds_indexes_filtered, idx_selected = self.preds_indexes_by_IOU(IOUs, IOU_thr, mode=self.mode)
 
         # preds_indexes_filtered = [pred_idx.item() for pred_idx, glip_idx in zip(preds_indexes, glip_indexes) if
         #                           phrases[glip_idx] == 'car']
 
         return preds_indexes_filtered, phrases
+
+
 
 
 if __name__ == "__main__":
