@@ -82,8 +82,11 @@ class Semi_Mono_DETR(BaseModel):
         self.unlabeled_set = unlabeled_set
         self.use_clip = cfg.get("use_clip", True)
         if self.use_clip:
-            print("------USE CLIP TO HELP------")
+            self.cls_clip_thr = cfg["semi_train_cfg"].get("cls_clip_thr", 0.0)
+            print(f"------USE CLIP TO HELP----- CLIP CLS THR: {self.cls_clip_thr}----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
+        self.depth_filter = cfg["semi_train_cfg"].get('depth_filter', False)
+        self.height_filter = cfg["semi_train_cfg"].get('height_filter', False)
 
     def forward(self, inputs, calibs, targets, info, mode):
         self.model.mode = mode
@@ -287,7 +290,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cls_clip_thr)
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -298,7 +301,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info,batch_inputs=inputs,cls_clip_threshold=self.cfg["semi_train_cfg"].get("cls_clip_thr",0.0))
+                    info,batch_inputs=inputs,cls_clip_threshold=self.cls_clip_thr)
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list
 
     def prepare_targets(self, targets, batch_size):
@@ -485,10 +488,13 @@ class Semi_Mono_DETR(BaseModel):
             calib = batch_calibs[bz]
             # target=batch_targets[bz]
             pseudo_labels = dets[:, 0]
+            crop_scale_bz = info["crop_scale"][bz]
             mask_cls_type = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_cls_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
             mask_depth_score_pseudo_thr = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_depth = np.zeros((len(pseudo_labels)), dtype=bool)
+            mask_height = np.zeros((len(pseudo_labels)), dtype=bool)
             for i in range(len(pseudo_labels)):
                 if self.id2cls[int(pseudo_labels[i])] in self.writelist:
                     mask_cls_type[i] = True
@@ -525,6 +531,20 @@ class Semi_Mono_DETR(BaseModel):
                     mask_score_pseudo_thr[i] = True
                 if dets[i, -1] > depth_score_thr:
                     mask_depth_score_pseudo_thr[i] = True
+                if self.depth_filter==True:
+                    depth= dets[i, 6]/crop_scale_bz
+                    # ignore the samples beyond the threshold [hard encoding]
+                    threshold = 65
+                    if depth >=2 and depth <=threshold:
+                        mask_depth[i] = True
+                else:
+                    mask_depth[i] = True
+                if self.height_filter==True:
+                    h = dets[i, 5]*384
+                    if h >=25:
+                        mask_height[i] = True
+                else:
+                    mask_height[i] = True
             mask = mask_cls_type & mask_cls_pseudo_thr & mask_score_pseudo_thr & mask_depth_score_pseudo_thr
             # print(mask.shape)
             dets = dets[mask]

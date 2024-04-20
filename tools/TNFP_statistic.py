@@ -21,8 +21,8 @@ import argparse
 # import cv2
 # import time
 
-from tools.semi_base3d_glip import SemiBase3DDetector
-# from tools.semi_base3d_clip import SemiBase3DDetector
+# from tools.semi_base3d_glip import SemiBase3DDetector
+from tools.semi_base3d_clip import SemiBase3DDetector
 # from tools.semi_base3d import SemiBase3DDetector
 import datetime
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
@@ -57,14 +57,24 @@ if 'LOCAL_RANK' not in os.environ:
 
 def main():
     assert (os.path.exists(args.config))
+
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     save_dir = "statistics"
     time_now = datetime.datetime.now().strftime('%m%d%H_%M')
     save_TNFP_dir = 'TNFP'
-    IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
-    cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.5)
-    filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
+    cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.1)
+    module_name = 'clip'
+    if module_name == 'clip':
+        from tools.semi_base3d_clip import SemiBase3DDetector
+        print(f"start statistics:  clsthr: {cls_thr}")
+        filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_CLIP_clsthr_{cls_thr}.txt"
+    elif module_name == 'glip':
+        from tools.semi_base3d_glip import SemiBase3DDetector
+        IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
+        print(f"start statistics:   IOU: {IOU_thr_glip}   clsthr: {cls_thr}")
+        filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
+
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(save_TNFP_dir, exist_ok=True)
     if cfg.get("visualize",False):
@@ -73,9 +83,8 @@ def main():
         # 创建新的文件夹
             os.mkdir('outputs_visual')
     checkpoint = cfg["trainer"].get("pretrain_model", None)
-    IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
-    cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.7)
-    print(f"start statistics:   IOU: {IOU_thr_glip}   clsthr: {cls_thr}")
+
+
     print(f"loading from CONFIG {checkpoint}")
     unlabeled_dataset = KITTI_Dataset(split=cfg["dataset"]["inference_split"], cfg=cfg['dataset'])
     subset = Subset(unlabeled_dataset, range(3769))     # 3712 3769 14940 40404  (4,5)->id=
@@ -125,7 +134,9 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
+        # boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
+        #     model.teacher(input_teacher, calib, targets, info, mode='statistics')
+        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
