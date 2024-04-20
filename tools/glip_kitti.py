@@ -232,8 +232,8 @@ class Glip_Kitti(object):
                     for logit
                     in logits
                 ]
-        # mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
-        mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        mask_class = torch.tensor([phrase == "car" for phrase in phrases]).nonzero(as_tuple=False).squeeze()
+        #mask_class = torch.tensor([phrase in self.phrases_list for phrase in phrases]).nonzero(as_tuple=False).squeeze()
 
         if len(mask_class.shape) == 0:
             mask_class = mask_class.unsqueeze(0)
@@ -274,7 +274,6 @@ class Glip_Kitti(object):
 
         size = torch.tensor([w, h, w, h],device=self.device)
         # print(size.device)
-        size = size.to(self.device)
         # print(f"{size.device}")
         boxes_from_glip = boxes_from_glip.to(self.device)
         boxes_from_preds = boxes_from_preds.to(self.device)
