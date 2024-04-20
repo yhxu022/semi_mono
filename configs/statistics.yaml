@@ -4,6 +4,8 @@ evaluate_only: True
 two_stages: True
 visualize: False
 use_glip: True
+use_clio: True
+
 dataset:
   type: &dataset_type 'KITTI'
   root_dir: 'data/KITTIDataset'
@@ -34,13 +36,13 @@ semi_train_cfg:
   sup_size: 0
   freeze_teacher: True # 冻结教师
   topk: 50
-  cls_pseudo_thr: 0.05 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.4 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
-  cls_clip_thr: 0.5 # 用于分类的clip阈值
+  cls_clip_thr: 0.0 # 用于分类的clip阈值
   depth_filter: True
   height_filter: True
   glip_box_threshold: 0.25
-  IOU_thr: 0.7
+  IOU_thr: 0.5
   depth_score_thr: 0
   pseudo_label_group_num: 1
 
