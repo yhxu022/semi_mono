@@ -82,10 +82,12 @@ class SemiBase3DDetector(BaseModel):
         if cfg.get("two_stages", False):
             print("----------------TWO STAGES----------------")
             # 支持加载MonoDETR官方训练权重
+            path = "/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth"
+            print(f"LOADING from {path}")
             student_model.load_state_dict(
-                torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
+                torch.load(path)['model_state'])
             teacher_model.load_state_dict(
-                torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
+                torch.load(path)['model_state'])
             # 加载自己预训练的权重
             # check_point=torch.load("/data/ipad_3d/monocular/semi_mono/outputs/monodetr_4gpu_origin_30pc/best_car_moderate_iter_33408.pth")["state_dict"]
             # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}

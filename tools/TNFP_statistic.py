@@ -64,7 +64,8 @@ def main():
     time_now = datetime.datetime.now().strftime('%m%d%H_%M')
     save_TNFP_dir = 'TNFP'
     cls_thr = cfg["semi_train_cfg"].get("cls_pseudo_thr", 0.1)
-    module_name = 'clip'
+    module_name = cfg.get('module_name', 'clip')
+    print(f'USE {module_name} TO INFER')
     if module_name == 'clip':
         from tools.semi_base3d_clip import SemiBase3DDetector
         print(f"start statistics:  clsthr: {cls_thr}")
@@ -134,15 +135,16 @@ def main():
         # print(f"image idx:  {id}")
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
-        # boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
-        #     model.teacher(input_teacher, calib, targets, info, mode='statistics')
-        boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
+        if module_name == 'glip':
+            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
+                model.teacher(input_teacher, calib, targets, info, mode='statistics')
+        elif module_name == 'clip':
+            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
         pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
         gts = []
         labels_gt = []
-        labels_pred = pseudo_labels_list
         if cfg.get("visualize",False):
             img = subset.dataset.get_image(id)
             img_from_file = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
@@ -314,14 +316,14 @@ def main():
         all_max_ious.extend(filtered_max_ious)
         all_depth_score.extend(pred_depth_scores)
         all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
-        description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
+        description = f"image idx: {id} |all_gts: {all_gts} |all_preds: {all_preds} |all_TP_2d: {all_TP_2d}"
         progress_bar.set_description(description)
         PRED_pic = num_pre
         GT_pic = num_gt
         FP_pic = num_pre - TP_pic
         FN_pic = num_gt - TP_pic
         with open(filename, "a") as file:
-            file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}   phrases2{phrases2}\n")
+            file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}\n")
 
         if cfg.get("visualize",False):
             objects = []
