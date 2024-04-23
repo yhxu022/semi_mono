@@ -9,6 +9,7 @@ import os
 import sys
 import numpy as np
 import cv2
+import torch
 from lib.datasets.kitti.kitti_utils import Object3d
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -182,28 +183,29 @@ def viz_kitti_video():
     return
 
 
-def show_image_with_boxes(img, objects, calib, color,mode="3D"):
+def show_image_with_boxes(img, objects, calib, color,mode="3D",bboxes=None):
     """ Show image with 2D or 3D bounding boxes """
     img= np.copy(img)
-    for obj in objects:
-        if isinstance(obj,Object3d):
-            obj.type=obj.cls_type 
-            obj.xmin=obj.box2d[0]
-            obj.ymin=obj.box2d[1]
-            obj.xmax=obj.box2d[2]
-            obj.ymax=obj.box2d[3]
-            obj.t=obj.pos
-        if obj.type == "DontCare":
-            continue
-        if obj.type == "Car":
-            if (mode=="2D"):
-                cv2.rectangle(
-                img,
-                (int(obj.xmin), int(obj.ymin)),
-                (int(obj.xmax), int(obj.ymax)),
-                color,
-                2,
-            )
+    if objects is not None:
+        for obj in objects:
+            if isinstance(obj,Object3d):
+                obj.type=obj.cls_type 
+                obj.xmin=round(obj.box2d[0])
+                obj.ymin=round(obj.box2d[1])
+                obj.xmax=round(obj.box2d[2])
+                obj.ymax=round(obj.box2d[3])
+                obj.t=obj.pos
+            if obj.type == "DontCare":
+                continue
+            if obj.type == "Car":
+                if (mode=="2D"):
+                    cv2.rectangle(
+                    img,
+                    (int(obj.xmin), int(obj.ymin)),
+                    (int(obj.xmax), int(obj.ymax)),
+                    color,
+                    2,
+                )
         # if obj.type == "Pedestrian":
         #     cv2.rectangle(
         #     img1,
@@ -220,35 +222,48 @@ def show_image_with_boxes(img, objects, calib, color,mode="3D"):
         #     (0, 255, 255),
         #     2,
         # )
-        if (mode=="3D"):
-            if obj.type == "Car":
-                box3d_pts_2d, _ = utils.compute_box_3d(obj, calib.P2)
-                if box3d_pts_2d is None:
-                    print("something wrong in the 3D box.")
-                    continue
-                img = utils.draw_projected_box3d(img, box3d_pts_2d, color= color)
-            # elif obj.type == "Pedestrian":
-            #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 0))
-            # elif obj.type == "Cyclist":
-            #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 255, 255))
+            if (mode=="3D"):
+                if obj.type == "Car":
+                    box3d_pts_2d, _ = utils.compute_box_3d(obj, calib.P2)
+                    if box3d_pts_2d is None:
+                        print("something wrong in the 3D box.")
+                        continue
+                    img = utils.draw_projected_box3d(img, box3d_pts_2d, color= color)
+                # elif obj.type == "Pedestrian":
+                #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(255, 255, 0))
+                # elif obj.type == "Cyclist":
+                #     img2 = utils.draw_projected_box3d(img2, box3d_pts_2d, color=(0, 255, 255))
 
 
-            # project
-            # box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
-            # box3d_pts_32d = utils.box3d_to_rgb_box00(box3d_pts_3d_velo)
-            # box3d_pts_32d = calib.project_velo_to_image(box3d_pts_3d_velo)
-            # img3 = utils.draw_projected_box3d(img3, box3d_pts_32d)
-        # print("img1:", img1.shape)
-        #cv2.imshow("2dbox", img1)
-        # print("img3:",img3.shape)
-        # Image.fromarray(img3).show()
-        # show3d = True
-        #if show3d:
-            # print("img2:",img2.shape)
-            #cv2.imshow("3dbox", img2)
-        #if depth is not None:
-            #cv2.imshow("depth", depth)
-        
+                # project
+                # box3d_pts_3d_velo = calib.project_rect_to_velo(box3d_pts_3d)
+                # box3d_pts_32d = utils.box3d_to_rgb_box00(box3d_pts_3d_velo)
+                # box3d_pts_32d = calib.project_velo_to_image(box3d_pts_3d_velo)
+                # img3 = utils.draw_projected_box3d(img3, box3d_pts_32d)
+            # print("img1:", img1.shape)
+            #cv2.imshow("2dbox", img1)
+            # print("img3:",img3.shape)
+            # Image.fromarray(img3).show()
+            # show3d = True
+            #if show3d:
+                # print("img2:",img2.shape)
+                #cv2.imshow("3dbox", img2)
+            #if depth is not None:
+                #cv2.imshow("depth", depth)
+    else:
+        for bbox in bboxes:
+            xmin=torch.round(bbox[0])
+            ymin=torch.round(bbox[1])
+            xmax=torch.round(bbox[2])
+            ymax=torch.round(bbox[3])
+            if (mode=="2D"):
+                cv2.rectangle(
+                    img,
+                    (int(xmin), int(ymin)),
+                    (int(xmax), int(ymax)),
+                    color,
+                    2,
+                )
     return img
 
 

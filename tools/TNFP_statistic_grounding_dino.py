@@ -1,4 +1,3 @@
-
 import warnings
 
 import cv2
@@ -21,8 +20,8 @@ import argparse
 # import cv2
 # import time
 
-#from tools.semi_base3d_glip import SemiBase3DDetector
-#from tools.semi_base3d_clip import SemiBase3DDetector
+from tools.semi_base3d_glip import SemiBase3DDetector
+# from tools.semi_base3d_clip import SemiBase3DDetector
 # from tools.semi_base3d import SemiBase3DDetector
 import datetime
 from lib.datasets.kitti.kitti_dataset import KITTI_Dataset
@@ -35,6 +34,7 @@ from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
 from utils.box_ops import box_iou
 from visual.Object_pred import Object3d_pred
 from visual.kitti_object import show_image_with_boxes, show_lidar_topview_with_boxes
+from tools.glip_kitti import Glip_Kitti
 """
 有没有可能时分类分数的伪标签不能反应教师预测的包围盒的质量，可以试试统计下预训练模型的依据分类分数筛选的boxes和gt的iou与该boxes的分类分数是不是正比，做一个散点图看看
 只用统计val上的就行，正好有gt在
@@ -57,7 +57,6 @@ if 'LOCAL_RANK' not in os.environ:
 
 def main():
     assert (os.path.exists(args.config))
-
     cfg = yaml.load(open(args.config, 'r'), Loader=yaml.Loader)
     config_name, _ = os.path.splitext(os.path.basename(args.config))
     save_dir = "statistics"
@@ -75,8 +74,6 @@ def main():
         IOU_thr_glip = cfg["semi_train_cfg"].get("IOU_thr", 0.7)
         print(f"start statistics:   IOU: {IOU_thr_glip}   clsthr: {cls_thr}")
         filename = f"{save_TNFP_dir}/{time_now}_TNFP_in_one_picture_IOU_{IOU_thr_glip}_clsthr_{cls_thr}.txt"
-    else:
-        from tools.semi_base3d import SemiBase3DDetector
 
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(save_TNFP_dir, exist_ok=True)
@@ -108,20 +105,7 @@ def main():
 
     all_gts = 0
     all_preds = 0
-    # GT中的正负面对象：
-    pos_in_gt = 0
-    neg_in_gt = 0
-    # 预测的正负面对象：
-    pos_in_pred = 0
-    neg_in_pred = 0
-
-    all_TP = 0
     all_TP_2d = 0
-    all_scores = []
-    all_max_ious = []
-    all_l2_distance = []
-    all_depth_score = []
-    all_pred_depth_and_cls_scores = []
 
     progress_bar = tqdm(loader)
     for inputs, calib, targets, info in progress_bar:
@@ -138,15 +122,27 @@ def main():
         info['img_size'] = info['img_size'].to("cuda")
         calibs_from_file = subset.dataset.get_calib(id)
         if module_name == 'glip':
-            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img, phrases2 = \
-                model.teacher(input_teacher, calib, targets, info, mode='statistics')
+            boxes_from_gd, logits, phrases = model.teacher.glip_kitti.predict(input_teacher[0], device=input_teacher[0].device)
+            w = info['img_size'][0,0]
+            h = info['img_size'][0,1]
+            size = torch.tensor([w, h, w, h],device=input_teacher[0].device)
+            boxes_from_glip = boxes_from_gd.to(input_teacher[0].device)
+            bbox_from_glip_orisize = boxes_from_glip * size
+            mask_height_glip=bbox_from_glip_orisize[:,-1]>=25
+            bbox_from_glip_orisize_height_filtered=bbox_from_glip_orisize[mask_height_glip]
+            mask_height_glip=mask_height_glip.nonzero(as_tuple=False).squeeze()
+            if len(mask_height_glip.shape) == 0:
+                mask_height_glip = mask_height_glip.unsqueeze(0)
+            phrases = [phrases[i] for i in mask_height_glip]
+            # 2d bboxs decoding
+            x = bbox_from_glip_orisize_height_filtered[:,0]
+            y = bbox_from_glip_orisize_height_filtered[:,1]
+            w = bbox_from_glip_orisize_height_filtered[:,2]
+            h = bbox_from_glip_orisize_height_filtered[:,3]
+            bbox = torch.stack([x - w / 2, y - h / 2, x + w / 2, y + h / 2], dim=1)
         elif module_name == 'clip':
-            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
+            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model = \
             model.teacher(input_teacher, calib, targets, info, mode='statistics')
-        else:
-            boxes_lidar, score, loc_list, depth_score_list, score_list, pseudo_labels_list, boxes_2d_from_model,dets_img = \
-                model.teacher(input_teacher, calib, targets, info, mode='statistics')
-        pseudo_labels_list = pseudo_labels_list[0].tolist()
         gt_objects = unlabeled_dataset.get_label(id)
         gts = []
         labels_gt = []
@@ -154,7 +150,6 @@ def main():
             img = subset.dataset.get_image(id)
             img_from_file = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
             calibs_from_file = subset.dataset.get_calib(id)
-            pc_velo = subset.dataset.get_lidar(id)
         
         for i in range(len(gt_objects)):
             # filter objects by writelist
@@ -218,109 +213,53 @@ def main():
             # 该图为负样本图
             num_gt = 0
             all_gts = all_gts + num_gt
-            if boxes_lidar is None:
+            if bbox is None:
                 num_pre = 0
             else:
-                num_pre = boxes_lidar.shape[0]
+                num_pre = bbox.shape[0]
             all_preds = all_preds + num_pre
-            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
+            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP_2d: {all_TP_2d}"
             progress_bar.set_description(description)
             if cfg.get("visualize",False):
-                objects = []
-                for det in dets_img:
-                    object = Object3d_pred(det.detach().cpu().numpy())
-                    objects.append(object)
-                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
-                img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
-                if (cfg["dataset"]["inference_split"] in ['test']):
-                    img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
-                if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
-                    img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
-                                                    mode="2D")
-                    img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
-                                                    mode="3D")
-                    img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
-                                                            objects_pred=objects)
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-                if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
-                    cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+                objects = None
+                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D",bboxes=bbox)
+                img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),mode="2D")
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d_GD.png', img_bbox2d)
             continue
-        if boxes_lidar is None:
+        if bbox is None:
             # 预测为0 ， gt不是0
             num_pre = 0
             num_gt = gt_boxes.shape[0]
             all_preds = all_preds + num_pre
             all_gts = all_gts + num_gt
-            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP: {all_TP} | all_TP_2d: {all_TP_2d}"
+            description = f"image idx: {id} | all_gts: {all_gts} | all_preds: {all_preds} | all_TP_2d: {all_TP_2d}"
             progress_bar.set_description(description)
             if cfg.get("visualize",False):
-                objects = []
-                for det in dets_img:
-                    object = Object3d_pred(det.detach().cpu().numpy())
-                    objects.append(object)
-                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
-                img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
-                if (cfg["dataset"]["inference_split"] in ['test']):
-                    img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
-                if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
-                    img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
-                                                    mode="2D")
-                    img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
-                                                    mode="3D")
-                    img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
-                                                            objects_pred=objects)
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-                if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
-                    cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+                objects = None
+                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D",bboxes=bbox)
+                img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),mode="2D")
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d_GD.png', img_bbox2d)
             continue
 
-        boxes_lidar = boxes_lidar.float().to('cuda')
-        iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
-        # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
-
-        iou2D,_= box_iou(boxes_2d_from_model, gt_boxes_2d)
+        #Grounding Dino模型输出
+        iou2D,_= box_iou(bbox, gt_boxes_2d) 
+        #原始模型
+        #iou2D,_= box_iou(boxes_2d_from_model, gt_boxes_2d)
         # iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
         max_iou_values_2d, max_iou_indices_2d = torch.max(iou2D, dim=1)
         valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > 0.7]  # [1,2,0]
         idx_selected_2d = []
         for idx in valid_indices_2d:
-            pred_label_2d = pseudo_labels_list[idx]
-            gt_label_2d = labels_gt[max_iou_indices_2d[idx]]
             if max_iou_indices_2d[idx] not in idx_selected_2d:
-                if pred_label_2d == gt_label_2d:
-                    all_TP_2d = all_TP_2d + 1
-                    TP_pic = TP_pic + 1
-                    idx_selected_2d.append(max_iou_indices_2d[idx])
-                else:
-                    wrong_labels.append(pred_label_2d)
+                all_TP_2d = all_TP_2d + 1
+                TP_pic = TP_pic + 1
+                idx_selected_2d.append(max_iou_indices_2d[idx])
 
-
-        num_pre = boxes_lidar.shape[0]
+        num_pre = bbox.shape[0]
         num_gt = gt_boxes.shape[0]
         all_preds = all_preds + num_pre
         all_gts = all_gts + num_gt
-        # max_iou_per_pred = torch.max(iou3D, dim=1)[0]
-        max_iou_values, max_iou_indices = torch.max(iou3D, dim=1)
-        valid_indices = [idx for idx, val in enumerate(max_iou_values.cpu().numpy()) if val > 0.7]   # [1,2,0]
-        filtered_scores = [score.cpu().numpy()[i] for i in valid_indices]
-        pred_depth_scores = [depth_score_list.cpu().numpy()[i] for i in valid_indices]
-        pred_depth_and_cls_scores = [score_list.cpu().numpy()[i] for i in valid_indices]
-        filtered_max_ious = [max_iou_values.cpu().numpy()[i] for i in valid_indices]
-        idx_selected = []
-        for idx in valid_indices:
-            pred_label = pseudo_labels_list[idx]
-            gt_label = labels_gt[max_iou_indices[idx]]
-            if max_iou_indices[idx] not in idx_selected:
-                if pred_label == gt_label:
-                    all_TP = all_TP + 1
-                    idx_selected.append(max_iou_indices[idx])
 
-        all_scores.extend(filtered_scores)
-        all_max_ious.extend(filtered_max_ious)
-        all_depth_score.extend(pred_depth_scores)
-        all_pred_depth_and_cls_scores.extend(pred_depth_and_cls_scores)
         description = f"image idx: {id} |all_gts: {all_gts} |all_preds: {all_preds} |all_TP_2d: {all_TP_2d}"
         progress_bar.set_description(description)
         PRED_pic = num_pre
@@ -331,42 +270,24 @@ def main():
             file.write(f"Image Index---{id}    GT---{GT_pic}    PRED---{PRED_pic}    TP: {TP_pic}    FP: {FP_pic}    FN: {FN_pic}    wronglist:{wrong_labels}\n")
 
         if cfg.get("visualize",False):
-            objects = []
-            for det in dets_img:
-                object = Object3d_pred(det.detach().cpu().numpy())
-                objects.append(object)
-            img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D")
-            img_bbox3d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="3D")
-            if (cfg["dataset"]["inference_split"] in ['test']):
-                img_bev = show_lidar_topview_with_boxes(pc_velo, objects, calibs_from_file)
-            if (cfg["dataset"]["inference_split"] not in ['test', 'eigen_clean', 'raw_mix']):
-                img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),
-                                                mode="2D")
-                img_bbox3d = show_image_with_boxes(img_bbox3d,gts, calibs_from_file, color=(0, 255, 0),
-                                                mode="3D")
-                img_bev = show_lidar_topview_with_boxes(pc_velo,gts, calibs_from_file,
-                                                        objects_pred=objects)
-            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d.png', img_bbox2d)
-            cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_3d.png', img_bbox3d)
-            if (cfg["dataset"]["inference_split"] not in ['eigen_clean', 'raw_mix']):
-                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_bev.png', img_bev)
+                objects = None
+                img_bbox2d = show_image_with_boxes(img_from_file, objects, calibs_from_file, color=(0, 0, 255), mode="2D",bboxes=bbox)
+                img_bbox2d = show_image_with_boxes(img_bbox2d,gts, calibs_from_file, color=(0, 255, 0),mode="2D")
+                cv2.imwrite(f'outputs_visual/KITTI_{cfg["dataset"]["inference_split"]}_{id}_2d_GD.png', img_bbox2d)
 
     print(filename)
     print(f"all_gts  --  {all_gts}")
     print(f"all_preds  --  {all_preds}")
-    print(f"all_TP  --  {all_TP} -- all_TP_2d  --   {all_TP_2d}")
-    all_FP = all_preds - all_TP
+    print(f"all_TP_2d  --   {all_TP_2d}")
     all_FP_2d = all_preds - all_TP_2d
-    print(f"all_FP  --  {all_FP} -- all_FP_2d  --  {all_FP_2d}")
-    all_FN = all_gts - all_TP
+    print(f"-- all_FP_2d  --  {all_FP_2d}")
     all_FN_2d = all_gts - all_TP_2d
-    print(f"all_FN  --  {all_FN} -- all_FN_2d  --  {all_FN_2d}")
-    print(len(all_depth_score))
+    print(f"-- all_FN_2d  --  {all_FN_2d}")
     with open(filename, "a") as file:
         file.write(f"Total: all_gts  --  {all_gts}     all_preds  --  {all_preds}")
-        file.write(f"all_TP - -  {all_TP} - - all_TP_2d - -   {all_TP_2d}")
-        file.write(f"all_FP  --  {all_FP} -- all_FP_2d  --  {all_FP_2d}")
-        file.write(f"all_FN  --  {all_FN} -- all_FN_2d  --  {all_FN_2d}")
+        file.write(f"all_TP_2d - -   {all_TP_2d}")
+        file.write(f"all_FP_2d  --  {all_FP_2d}")
+        file.write(f"all_FN_2d  --  {all_FN_2d}")
 
 
 if __name__ == '__main__':

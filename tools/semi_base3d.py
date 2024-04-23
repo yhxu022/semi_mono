@@ -67,8 +67,8 @@ class SemiBase3DDetector(BaseModel):
         student_model, student_loss = build_model(model_cfg)
         teacher_model, teacher_loss = build_model(model_cfg)
         #支持加载MonoDETR官方训练权重
-        student_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
-        teacher_model.load_state_dict(torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth")['model_state'])
+        student_model.load_state_dict(torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
+        teacher_model.load_state_dict(torch.load("/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth")['model_state'])
         # check_point=torch.load("/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_30.pth")["state_dict"]
         # ckpt={k.replace('model.', ''): v for k, v in check_point.items()}
         # student_model.load_state_dict(ckpt)

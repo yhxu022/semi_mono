@@ -5,7 +5,7 @@ from PIL import Image
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load('ViT-L/14@336px', device=device)
 
-image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/data/KITTIDataset/training/image_2/000008.png")).unsqueeze(0).to(device)
+image = preprocess(Image.open("/data/ipad_3d/monocular/semi_mono/outputs/Clip/19_0.jpg")).unsqueeze(0).to(device)
 text = clip.tokenize(["a diagram","a car","a dog", "a cat"]).to(device)
 
 with torch.no_grad():

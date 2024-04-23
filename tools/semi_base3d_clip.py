@@ -82,7 +82,7 @@ class SemiBase3DDetector(BaseModel):
         if cfg.get("two_stages", False):
             print("----------------TWO STAGES----------------")
             # 支持加载MonoDETR官方训练权重
-            path = "/home/xyh/MonoDETR_semi_baseline_33/ckpts/MonoDETR_pretrained_100.pth"
+            path = "/data/ipad_3d/monocular/semi_mono/checkpoint_best_2.pth"
             print(f"LOADING from {path}")
             student_model.load_state_dict(
                 torch.load(path)['model_state'])

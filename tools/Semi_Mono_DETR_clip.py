@@ -285,7 +285,7 @@ class Semi_Mono_DETR(BaseModel):
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
@@ -296,13 +296,13 @@ class Semi_Mono_DETR(BaseModel):
                                                              K=self.pseudo_label_group_num * self.max_objs,
                                                              topk=self.pseudo_label_group_num *
                                                                   self.cfg["semi_train_cfg"]['topk'])
-                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d = self.get_boxes_lidar_and_clsscore(
+                boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img = self.get_boxes_lidar_and_clsscore(
                     dets, calibs, dets.shape[0],
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
                     info,batch_inputs=inputs,cls_clip_threshold=self.cls_clip_thr)
-            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d
+            return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d,dets_img
 
     def prepare_targets(self, targets, batch_size):
         targets_list = []
@@ -517,11 +517,12 @@ class Semi_Mono_DETR(BaseModel):
                             if self.clip_kitti.analyze_pred_result(prob=probs, pred=pred, label=pseudo_labels[i],thr=cls_clip_threshold):
                                 mask_cls_pseudo_thr[i] = True
                                 prob_from_clip.append(probs[0][pred])
-                            # else:
-                            #     if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
-                            #         with open(file="your_file_path.txt", mode="a") as f:
-                            #             f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
-                            #             croped_image.save(f"wrong/{info['img_id'][bz]}_{i}.jpg")
+                                #croped_image.save(f"/data/ipad_3d/monocular/semi_mono/outputs/Clip/{info['img_id'][bz]}_{i}.jpg")
+                            else:
+                                if int(pred) != pseudo_labels[i] and pseudo_labels[i] == 1:
+                                    with open(file="/data/ipad_3d/monocular/semi_mono/outputs/Clip/clip.txt", mode="a") as f:
+                                        f.write(f"{info['img_id'][bz]}_{i} -- {pred} -- {probs}\n")
+                                        croped_image.save(f"/data/ipad_3d/monocular/semi_mono/outputs/Clip/{info['img_id'][bz]}_{i}.jpg")
                     else:
                         mask_cls_pseudo_thr[i] = True
                     score_list.append(dets[i, 1])
@@ -595,7 +596,7 @@ class Semi_Mono_DETR(BaseModel):
         scores_list = torch.tensor(scores_list)
         scores_list = torch.squeeze(scores_list, dim=0)
         # pseudo_labels_list = torch.tensor(pseudo_labels_list)
-        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d
+        return boxes_lidar, score_list, loc, depth_score_list, scores_list, pseudo_labels_list, boxes_2d, dets_img
         # return boxes_lidar, score_list, loc, prob_from_clip, scores_list, pseudo_labels_list
 
     # score_list：分类分    depth_score_list：深度分    scores_list：分类分和深度分相乘

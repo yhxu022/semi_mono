@@ -11,10 +11,10 @@ class Clip_Kitti(object):
         # "Black Car","Black Van","Black Truck","Gray Car","Gray Van","Gray Truck", "SUV"]
         # self.kitti_classes = ["Background",'Car', 'Cyclist',"Van","Truck","asphalt road","road","tree","sky","wall","SUV"]
         # self.kitti_classes = ["Background", 'Car', 'Cyclist', "Van", "Truck", "asphalt road", "road", "tree", "sky", "wall", "Sedan"]
-        # self.kitti_classes = ["Van", 'Car', "Truck"]
+        self.kitti_classes = ["Van", 'Car', "Truck"]
         # self.kitti_classes = ["Car", "Truck","Pickup Truck","Sedan","Saloon","SUV","Coupe","Sports Car"]
         # self.kitti_classes = ["Car","Delivery Truck", "Dump Truck", "Semi Truck", "Pickup Truck", "Sedan", "Saloon", "SUV", "Coupe", "Sports Car"]
-        self.kitti_classes = ["Delivery Truck", "Dump Truck", "Semi Truck", "Pickup Truck", "Sedan", "Saloon", "SUV", "Coupe", "Sports Car","Luxury Car"]
+        # self.kitti_classes = ["Delivery Truck", "Dump Truck", "Semi Truck", "Pickup Truck", "Sedan", "Saloon", "SUV", "Coupe", "Sports Car","Luxury Car"]
         self.kitti_templates = ["This is a photo of a {}."]
         print(f"{len(self.kitti_classes)} classes, {len(self.kitti_templates)} templates")
 
@@ -72,5 +72,5 @@ class Clip_Kitti(object):
 
 if __name__ == "__main__":
     clip_kitti = Clip_Kitti()
-    probs, pred = clip_kitti.predict(Image.open("/home/xyh/MonoDETR_semi_baseline_33/wrong/6_0.jpg"), device='cuda')
+    probs, pred = clip_kitti.predict(Image.open("/data/ipad_3d/monocular/semi_mono/outputs/Clip/19_1.jpg"), device='cuda')
     print(probs, pred, clip_kitti.kitti_classes[int(pred)])

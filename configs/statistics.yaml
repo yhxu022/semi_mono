@@ -2,7 +2,7 @@ random_seed: 1
 deterministic: False
 evaluate_only: True
 two_stages: True
-visualize: False
+visualize: True
 use_glip: True
 module_name: 'glip'
 dataset:
@@ -35,7 +35,7 @@ semi_train_cfg:
   sup_size: 0
   freeze_teacher: True # 冻结教师
   topk: 50
-  cls_pseudo_thr: 0.4 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.05 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
   cls_clip_thr: 0.0 # 用于分类的clip阈值
   depth_filter: True
@@ -127,5 +127,5 @@ tester:
   type: *dataset_type
   mode: single  # 'single' or 'all'; 'all' to evaluate all ckpts in the folder
   checkpoint: 195  # the start ckpt epoch for 'all'
-  threshold: 0.2  # confidence filter
+  threshold: 0.05  # confidence filter
   topk: 50
