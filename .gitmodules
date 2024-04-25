@@ -1,0 +1,3 @@
+[submodule "thirdparty/Metric3D"]
+	path = thirdparty/Metric3D
+	url = https://github.com/HB16888/Metric3D.git
