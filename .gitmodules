@@ -4,3 +4,6 @@
 [submodule "thirdparty/UniDepth"]
 	path = thirdparty/UniDepth
 	url = https://github.com/lpiccinelli-eth/UniDepth.git
+[submodule "thirdparty/Depth-Anything"]
+	path = thirdparty/Depth-Anything
+	url = https://github.com/LiheYoung/Depth-Anything.git
