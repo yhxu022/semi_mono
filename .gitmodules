@@ -1,3 +1,6 @@
 [submodule "thirdparty/Metric3D"]
 	path = thirdparty/Metric3D
 	url = https://github.com/HB16888/Metric3D.git
+[submodule "thirdparty/UniDepth"]
+	path = thirdparty/UniDepth
+	url = https://github.com/lpiccinelli-eth/UniDepth.git
