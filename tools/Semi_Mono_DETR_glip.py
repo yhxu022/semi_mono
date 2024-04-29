@@ -7,7 +7,7 @@ from uncertainty_estimator import UncertaintyEstimator
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import nms_gpu
 from pcdet.ops.iou3d_nms.iou3d_nms_utils import boxes_iou3d_gpu
 from torchvision.transforms import ToPILImage
-
+from utils.iou2d_utils import bbox_iou
 
 def class2angle_gpu(cls, residual, to_label_format=False, num_heading_bin=12):
     angle_per_class = 2 * torch.pi / float(num_heading_bin)
@@ -87,6 +87,10 @@ class Semi_Mono_DETR(BaseModel):
         if self.use_glip:
             self.IOU_thr = cfg["semi_train_cfg"].get("IOU_thr", 0.5)
             print(F"------USE GLIP TO HELP-- IOU THR: {self.IOU_thr}----")
+        self.use_gt_depth=cfg["semi_train_cfg"].get("use_gt_depth",False)
+        if self.use_gt_depth:
+            self.gt_2diou_thr=cfg["semi_train_cfg"].get("gt_2diou_thr",0.5)
+            print("------USE GT DEPTH TO HELP----")
         self.decouple = cfg["semi_train_cfg"].get('decouple', False)
         self.depth_filter = cfg["semi_train_cfg"].get('depth_filter', False)
         self.height_filter = cfg["semi_train_cfg"].get('height_filter', False)
@@ -291,6 +295,11 @@ class Semi_Mono_DETR(BaseModel):
                 glip_inputs = inputs
             else:
                 glip_inputs = None
+            if self.use_gt_depth:
+                targets = self.prepare_targets(targets, inputs.shape[0])
+                gts=targets
+            else:
+                gts=None
             if self.pseudo_label_group_num == 1:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs, K=self.max_objs,
                                                              topk=self.cfg["semi_train_cfg"]['topk'])
@@ -299,7 +308,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
+                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0),gts=gts)
             else:
                 dets, topk_boxes = extract_dets_from_outputs(outputs=outputs,
                                                              K=self.pseudo_label_group_num * self.max_objs,
@@ -310,7 +319,7 @@ class Semi_Mono_DETR(BaseModel):
                     self.cfg["semi_train_cfg"]["cls_pseudo_thr"],
                     self.cfg["semi_train_cfg"]["score_pseudo_thr"],
                     self.cfg["semi_train_cfg"].get("depth_score_thr", 0),
-                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0))
+                    info, batch_inputs=glip_inputs, cls_glip_threshold=self.cfg["semi_train_cfg"].get("cls_glip_thr", 0.0),gts=gts)
             return boxes_lidar, score, loc_list, depth_score_list, scores, pseudo_labels_list, boxes_2d, dets_img, phrases2
 
     def prepare_targets(self, targets, batch_size):
@@ -486,7 +495,7 @@ class Semi_Mono_DETR(BaseModel):
 
     def get_boxes_lidar_and_clsscore(self, batch_dets, batch_calibs, batch_size, cls_pseudo_thr,
                                      score_pseudo_thr, depth_score_thr, info, batch_inputs=None,
-                                     cls_glip_threshold=0.0):
+                                     cls_glip_threshold=0.0,gts=None):
         cls_score_list = batch_dets[:, :, 1]
         score_list = []
         depth_score_list = []
@@ -495,6 +504,8 @@ class Semi_Mono_DETR(BaseModel):
         prob_from_glip = []
         # print(f"cls_scroe_list:      {cls_score_list.shape}")
         for bz in range(batch_size):
+            if gts is not None:
+                target=gts[bz]
             crop_scale_bz=info["crop_scale"][bz]
             dets = batch_dets[bz]
             calib = batch_calibs[bz]
@@ -552,6 +563,23 @@ class Semi_Mono_DETR(BaseModel):
                 mask_from_glip = np.ones((len(dets[:, 0])), dtype=bool)
 
             dets = dets[mask_from_glip]
+            if gts is not None:
+                if len(dets) > 0 and len(target['labels'])>0:
+                    w = int(info['img_size'][bz][0])
+                    h = int(info['img_size'][bz][1])
+                    size = torch.tensor([w, h, w, h],device=dets.device)
+                    bboxes_from_preds = dets[:, 2:6].to(torch.float32)
+                    boxes_gt = target['boxes'].to(torch.float32).to(dets.device)
+                    bboxes_from_preds_orisize = bboxes_from_preds * size
+                    boxes_gt_orisize = boxes_gt * size
+                    IOUs = bbox_iou(boxes_gt_orisize,bboxes_from_preds_orisize)
+                    max_iou_values_2d, max_iou_indices_2d = torch.max(IOUs, dim=1)
+                    valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > self.gt_2diou_thr]  # [1,2,0]
+                    idx_selected_2d = []
+                    for idx in valid_indices_2d:
+                        if max_iou_indices_2d[idx] not in idx_selected_2d:
+                            dets[max_iou_indices_2d[idx],6]=target['depth'][idx]
+                            idx_selected_2d.append(max_iou_indices_2d[idx])                
             pseudo_labels_list.append(dets[:, 0])
             if len(dets) > 0:
                 scores = dets[:, 1]

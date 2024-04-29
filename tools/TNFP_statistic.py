@@ -279,15 +279,17 @@ def main():
         boxes_lidar = boxes_lidar.float().to('cuda')
         iou3D = boxes_iou3d_gpu(boxes_lidar, gt_boxes)  # [num_pre, num_gt]
         # iou3D = boxes_iou3d_gpu(gt_boxes, boxes_lidar)
-
-        iou2D,_= box_iou(boxes_2d_from_model, gt_boxes_2d)
+        #每个预测结果匹配GT框
+        #iou2D,_= box_iou(boxes_2d_from_model, gt_boxes_2d)
+        #每个GT框匹配预测结果
+        iou2D,_= box_iou(gt_boxes_2d,boxes_2d_from_model)
         # iou2D = bbox_iou(boxes_2d_from_model, gt_boxes_2d)
         max_iou_values_2d, max_iou_indices_2d = torch.max(iou2D, dim=1)
         valid_indices_2d = [idx for idx, val in enumerate(max_iou_values_2d.cpu().numpy()) if val > 0.7]  # [1,2,0]
         idx_selected_2d = []
         for idx in valid_indices_2d:
-            pred_label_2d = pseudo_labels_list[idx]
-            gt_label_2d = labels_gt[max_iou_indices_2d[idx]]
+            pred_label_2d = pseudo_labels_list[max_iou_indices_2d[idx]]
+            gt_label_2d = labels_gt[idx]
             if max_iou_indices_2d[idx] not in idx_selected_2d:
                 if pred_label_2d == gt_label_2d:
                     all_TP_2d = all_TP_2d + 1

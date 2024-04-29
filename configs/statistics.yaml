@@ -35,16 +35,17 @@ semi_train_cfg:
   sup_size: 0
   freeze_teacher: True # 冻结教师
   topk: 50
-  cls_pseudo_thr: 0.4 # 类 pseudobox 阈值
+  cls_pseudo_thr: 0.0 # 类 pseudobox 阈值
   score_pseudo_thr: 0 # pseudobox 阈值
+  depth_score_thr: 0 # 深度分数阈值
   cls_clip_thr: 0.0 # 用于分类的clip阈值
   depth_filter: True
   height_filter: True
   glip_box_threshold: 0.25
   IOU_thr: 0.7
-  depth_score_thr: 0
   pseudo_label_group_num: 1
-
+  use_gt_depth: False
+  gt_2diou_thr: 0.5
 semi_test_cfg: 
   predict_on: 'teacher'
 
